@@ -390,6 +390,56 @@ func TestWriteMarkdownBranchSummaryKeepsDirectDecisionCalls(t *testing.T) {
 	}
 }
 
+func TestWriteMarkdownDecisionSummaryIncludesUnexportedHelpers(t *testing.T) {
+	var buf bytes.Buffer
+	err := WriteMarkdown(&buf, []model.APIFlow{
+		{
+			Name:       "ProcessReport",
+			Kind:       "grpc",
+			Entrypoint: model.Entrypoint{Symbol: "Service.ProcessReport", File: "handler.go", Line: 10},
+			Request:    model.TypeRef{Type: "*ProcessReportRequest"},
+			Response:   model.TypeRef{Type: "*Report"},
+			Trail: model.Trail{
+				Branches: []model.BranchTrace{
+					{
+						Kind:     "if",
+						Function: "reportApplication.ProcessReport",
+						Expr:     "cmd.Fast",
+						File:     "application.go",
+						Line:     30,
+						Cases: []model.BranchCase{
+							{
+								Labels: []string{"then"},
+								Layers: []model.LayerCalls{
+									{
+										Name: "application",
+										Calls: []model.CallRef{
+											{Symbol: "a.fastPath", Receiver: "a", Method: "fastPath", File: "application.go", Line: 32, Depth: 2, Via: "reportApplication.ProcessReport"},
+											{Symbol: "reportApplication.fastPath", Receiver: "reportApplication", Method: "fastPath", File: "application.go", Line: 70, Depth: 3, Via: "a.fastPath"},
+										},
+									},
+								},
+								Unknown: []model.CallRef{
+									{Symbol: "trace.Debug", Receiver: "trace", Method: "Debug", File: "application.go", Line: 33, Depth: 4, Via: "reportApplication.ProcessReport"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("WriteMarkdown returned error: %v", err)
+	}
+
+	got := buf.String()
+	want := "| `reportApplication.ProcessReport` (application.go:30) | if `cmd.Fast` | then | application: `reportApplication.fastPath`<br>other: `trace.Debug` |"
+	if !strings.Contains(got, want) {
+		t.Fatalf("markdown output hides unexported branch calls %q:\n%s", want, got)
+	}
+}
+
 func TestWriteMarkdownIncludesDispatchSummary(t *testing.T) {
 	var buf bytes.Buffer
 	err := WriteMarkdown(&buf, []model.APIFlow{

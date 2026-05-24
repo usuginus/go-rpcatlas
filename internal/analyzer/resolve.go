@@ -17,6 +17,7 @@ type scopeInfo struct {
 	receiverFields        map[string]string
 	localTypes            map[string]string
 	localConcreteTypes    map[string]map[string]bool
+	localDispatchTables   map[string]dispatchTableInfo
 	localDispatches       map[string]dispatchLookupInfo
 	structFields          map[string]map[string]string
 	interfaces            map[string]map[string]bool
@@ -41,6 +42,7 @@ func newScope(fset *token.FileSet, fn *ast.FuncDecl, index projectIndex, package
 		constructorFieldTypes: index.constructorFieldTypes,
 	}
 	scope.localTypes, scope.localConcreteTypes = collectLocalTypes(fn, index, scope)
+	scope.localDispatchTables = collectLocalDispatchTables(fset, fn.Body, index)
 	scope.localDispatches = collectLocalDispatches(fset, fn.Body, index, scope)
 	return scope
 }
@@ -224,6 +226,14 @@ func callRef(fset *token.FileSet, file string, call *ast.CallExpr, index project
 	ref.Receiver = target.Receiver
 	ref.Method = target.Method
 	ref.Symbol = target.Symbol
+	if selector, ok := call.Fun.(*ast.SelectorExpr); ok {
+		if _, ok := selector.X.(*ast.IndexExpr); ok {
+			if receiver := nodeString(fset, selector.X); receiver != "" {
+				ref.Receiver = receiver
+				ref.Symbol = receiver + "." + ref.Method
+			}
+		}
+	}
 	return ref
 }
 

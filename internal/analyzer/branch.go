@@ -87,6 +87,85 @@ func recordTypeSwitchBranchTrace(
 	appendBranchTrace(flow, trace)
 }
 
+func recordIfBranchTrace(
+	fset *token.FileSet,
+	file string,
+	flow *model.APIFlow,
+	stmt *ast.IfStmt,
+	scope scopeInfo,
+	index projectIndex,
+	depth int,
+	function string,
+	maxDepth int,
+	ruleSet rules.RuleSet,
+	stdlibPackageAliases map[string]bool,
+) {
+	pos := fset.Position(stmt.If)
+	trace := model.BranchTrace{
+		Kind:     "if",
+		Function: function,
+		Expr:     nodeString(fset, stmt.Cond),
+		File:     file,
+		Line:     pos.Line,
+		Depth:    depth,
+	}
+	appendIfBranchCases(fset, file, &trace, stmt, scope, index, depth, function, maxDepth, ruleSet, stdlibPackageAliases)
+	appendBranchTrace(flow, trace)
+}
+
+func appendIfBranchCases(
+	fset *token.FileSet,
+	file string,
+	trace *model.BranchTrace,
+	stmt *ast.IfStmt,
+	scope scopeInfo,
+	index projectIndex,
+	depth int,
+	function string,
+	maxDepth int,
+	ruleSet rules.RuleSet,
+	stdlibPackageAliases map[string]bool,
+) {
+	thenCase := model.BranchCase{Labels: []string{"then"}}
+	traceBranchCaseCalls(fset, file, &thenCase, stmt.Body.List, scope, index, depth, function, maxDepth, ruleSet, stdlibPackageAliases)
+	if branchCaseHasCalls(thenCase) {
+		trace.Cases = append(trace.Cases, thenCase)
+	}
+	appendIfElseCases(fset, file, trace, stmt.Else, scope, index, depth, function, maxDepth, ruleSet, stdlibPackageAliases)
+}
+
+func appendIfElseCases(
+	fset *token.FileSet,
+	file string,
+	trace *model.BranchTrace,
+	elseNode ast.Stmt,
+	scope scopeInfo,
+	index projectIndex,
+	depth int,
+	function string,
+	maxDepth int,
+	ruleSet rules.RuleSet,
+	stdlibPackageAliases map[string]bool,
+) {
+	switch node := elseNode.(type) {
+	case nil:
+		return
+	case *ast.BlockStmt:
+		elseCase := model.BranchCase{Default: true}
+		traceBranchCaseCalls(fset, file, &elseCase, node.List, scope, index, depth, function, maxDepth, ruleSet, stdlibPackageAliases)
+		if branchCaseHasCalls(elseCase) {
+			trace.Cases = append(trace.Cases, elseCase)
+		}
+	case *ast.IfStmt:
+		elseIfCase := model.BranchCase{Labels: []string{"else if " + nodeString(fset, node.Cond)}}
+		traceBranchCaseCalls(fset, file, &elseIfCase, node.Body.List, scope, index, depth, function, maxDepth, ruleSet, stdlibPackageAliases)
+		if branchCaseHasCalls(elseIfCase) {
+			trace.Cases = append(trace.Cases, elseIfCase)
+		}
+		appendIfElseCases(fset, file, trace, node.Else, scope, index, depth, function, maxDepth, ruleSet, stdlibPackageAliases)
+	}
+}
+
 func traceBranchCaseCalls(
 	fset *token.FileSet,
 	file string,
@@ -160,6 +239,68 @@ func traceFunctionCallsForBranchCase(
 	})
 }
 
+func traceIfCasesForFlow(
+	fset *token.FileSet,
+	file string,
+	flow *model.APIFlow,
+	stmt *ast.IfStmt,
+	scope scopeInfo,
+	index projectIndex,
+	depth int,
+	via string,
+	maxDepth int,
+	ruleSet rules.RuleSet,
+	stdlibPackageAliases map[string]bool,
+) {
+	traceIfInitForFlow(fset, file, flow, stmt.Init, scope, index, depth, via, maxDepth, ruleSet, stdlibPackageAliases)
+	traceCaseCallsForFlow(fset, file, flow, stmt.Body.List, scope, index, depth, via, maxDepth, ruleSet, stdlibPackageAliases)
+	traceIfElseForFlow(fset, file, flow, stmt.Else, scope, index, depth, via, maxDepth, ruleSet, stdlibPackageAliases)
+}
+
+func traceIfInitForFlow(
+	fset *token.FileSet,
+	file string,
+	flow *model.APIFlow,
+	init ast.Stmt,
+	scope scopeInfo,
+	index projectIndex,
+	depth int,
+	via string,
+	maxDepth int,
+	ruleSet rules.RuleSet,
+	stdlibPackageAliases map[string]bool,
+) {
+	if init == nil {
+		return
+	}
+	traceCaseCallsForFlow(fset, file, flow, []ast.Stmt{init}, scope, index, depth, via, maxDepth, ruleSet, stdlibPackageAliases)
+}
+
+func traceIfElseForFlow(
+	fset *token.FileSet,
+	file string,
+	flow *model.APIFlow,
+	elseNode ast.Stmt,
+	scope scopeInfo,
+	index projectIndex,
+	depth int,
+	via string,
+	maxDepth int,
+	ruleSet rules.RuleSet,
+	stdlibPackageAliases map[string]bool,
+) {
+	switch node := elseNode.(type) {
+	case nil:
+		return
+	case *ast.BlockStmt:
+		traceCaseCallsForFlow(fset, file, flow, node.List, scope, index, depth, via, maxDepth, ruleSet, stdlibPackageAliases)
+	case *ast.IfStmt:
+		traceIfInitForFlow(fset, file, flow, node.Init, scope, index, depth, via, maxDepth, ruleSet, stdlibPackageAliases)
+		traceCaseCallsForFlow(fset, file, flow, node.Body.List, scope, index, depth, via, maxDepth, ruleSet, stdlibPackageAliases)
+		traceIfElseForFlow(fset, file, flow, node.Else, scope, index, depth, via, maxDepth, ruleSet, stdlibPackageAliases)
+	}
+}
+
 func traceTypeSwitchCasesForFlow(
 	fset *token.FileSet,
 	file string,
@@ -199,6 +340,10 @@ func traceCaseCallsForFlow(
 	for _, stmt := range body {
 		ast.Inspect(stmt, func(node ast.Node) bool {
 			switch n := node.(type) {
+			case *ast.IfStmt:
+				recordIfBranchTrace(fset, file, flow, n, scope, index, depth, via, maxDepth, ruleSet, stdlibPackageAliases)
+				traceIfCasesForFlow(fset, file, flow, n, scope, index, depth, via, maxDepth, ruleSet, stdlibPackageAliases)
+				return false
 			case *ast.SwitchStmt:
 				recordSwitchBranchTrace(fset, file, flow, n, scope, index, depth, via, maxDepth, ruleSet, stdlibPackageAliases)
 			case *ast.TypeSwitchStmt:
@@ -211,9 +356,11 @@ func traceCaseCallsForFlow(
 				if !added || depth >= maxDepth {
 					return true
 				}
-				recordDispatchCall(fset, flow, ref, scope, index, depth+1, maxDepth, ruleSet)
-				for _, candidate := range resolveCandidates(ref, scope, index, ruleSet) {
-					candidateDepth := depth + 1
+				candidateDepth := depth + 1
+				resolved := resolveCall(ref, scope, index, ruleSet)
+				recordInterfaceCall(fset, flow, ref, resolved, candidateDepth, maxDepth)
+				recordDispatchCall(fset, flow, n, ref, scope, index, candidateDepth, maxDepth, ruleSet)
+				for _, candidate := range resolved.candidates {
 					recordImplementation(fset, flow, candidate, ref.Symbol, candidateDepth, ruleSet)
 					if candidateDepth < maxDepth {
 						traceFunctionCalls(fset, flow, candidate, index, candidateDepth, implementationSymbol(candidate), maxDepth, ruleSet)

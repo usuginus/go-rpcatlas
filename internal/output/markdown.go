@@ -298,7 +298,7 @@ func writeConditionalPathsTable(w io.Writer, branches []model.BranchTrace) {
 				"| %s | %s | %s | %s |\n",
 				tableCell(branchFunctionCell(branch)),
 				tableCell(branchCondition(branch)),
-				tableCell(branchCaseTitle(branchCase)),
+				tableCell(branchCaseTitle(branch, branchCase)),
 				tableCell(branchCaseCallsCell(branch, branchCase)),
 			)
 		}
@@ -320,7 +320,7 @@ func branchCondition(branch model.BranchTrace) string {
 
 func branchCaseCallsCell(branch model.BranchTrace, branchCase model.BranchCase) string {
 	layers, unknown := directBranchCaseLayerCalls(branch, branchCase)
-	return layerCallsCell(layers, unknown)
+	return decisionCallsCell(layers, unknown)
 }
 
 func directBranchCaseLayerCalls(branch model.BranchTrace, branchCase model.BranchCase) ([]model.LayerCalls, []model.CallRef) {
@@ -362,6 +362,8 @@ func allBranchCaseCalls(branchCase model.BranchCase) []model.CallRef {
 
 func branchKindLabel(kind string) string {
 	switch kind {
+	case "if":
+		return "if"
 	case "type_switch":
 		return "type switch"
 	default:
@@ -369,7 +371,10 @@ func branchKindLabel(kind string) string {
 	}
 }
 
-func branchCaseTitle(branchCase model.BranchCase) string {
+func branchCaseTitle(branch model.BranchTrace, branchCase model.BranchCase) string {
+	if branch.Kind == "if" {
+		return ifBranchCaseTitle(branchCase)
+	}
 	if branchCase.Default {
 		return "default"
 	}
@@ -377,6 +382,20 @@ func branchCaseTitle(branchCase model.BranchCase) string {
 		return "case"
 	}
 	return "case " + inlineCodeList(branchCase.Labels)
+}
+
+func ifBranchCaseTitle(branchCase model.BranchCase) string {
+	if branchCase.Default {
+		return "else"
+	}
+	if len(branchCase.Labels) == 0 || branchCase.Labels[0] == "then" {
+		return "then"
+	}
+	label := branchCase.Labels[0]
+	if condition, ok := strings.CutPrefix(label, "else if "); ok {
+		return "else if " + inlineCode(condition)
+	}
+	return inlineCodeList(branchCase.Labels)
 }
 
 func writeKeyedDispatchesTable(w io.Writer, dispatches []model.DispatchTrace) {
@@ -432,15 +451,28 @@ func dispatchCaseTitle(dispatchCase model.DispatchCase) string {
 }
 
 func layerCallsCell(layers []model.LayerCalls, unknown []model.CallRef) string {
+	return callsCell(layers, unknown, visibleLayerCalls, visibleUnknownCalls)
+}
+
+func decisionCallsCell(layers []model.LayerCalls, unknown []model.CallRef) string {
+	return callsCell(layers, unknown, visibleDecisionLayerCalls, visibleDecisionUnknownCalls)
+}
+
+func callsCell(
+	layers []model.LayerCalls,
+	unknown []model.CallRef,
+	visibleLayers func([]model.CallRef) []model.CallRef,
+	visibleUnknown func([]model.CallRef) []model.CallRef,
+) string {
 	var parts []string
 	for _, layer := range layers {
-		calls := visibleLayerCalls(layer.Calls)
+		calls := visibleLayers(layer.Calls)
 		if len(calls) == 0 {
 			continue
 		}
 		parts = append(parts, fmt.Sprintf("%s: %s", layer.Name, callNamesCell(calls)))
 	}
-	unknownCalls := visibleUnknownCalls(unknown)
+	unknownCalls := visibleUnknown(unknown)
 	if len(unknownCalls) > 0 {
 		parts = append(parts, fmt.Sprintf("other: %s", callNamesCell(unknownCalls)))
 	}
