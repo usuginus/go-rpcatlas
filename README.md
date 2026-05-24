@@ -8,6 +8,12 @@ It is built for code review, onboarding, and AI-assisted code reading: point it 
 handler, then get a deterministic Markdown or JSON summary of the relevant calls,
 layers, branches, dispatches, and interface/function-value edges.
 
+
+
+https://github.com/user-attachments/assets/fb778bb9-be8a-4b7b-8bb1-4cdcd8bd7da3
+
+
+
 ## Features
 
 - Find gRPC-style handlers and list available RPCs.
