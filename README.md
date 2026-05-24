@@ -173,13 +173,13 @@ repositories, at the cost of some precision versus a full type checker.
 Markdown output is deterministic and optimized for review, onboarding, and
 LLM-assisted documentation. It renders a static call tree from syntax-driven
 call relationships, then adds a compact function index with locations and
-occurrence counts. Layer names come directly from the active rules, decision
-points are rendered as tables, and unexported helper calls are omitted so the
-output stays readable without project-specific presentation rules baked into the
-binary. Interface implementations are static candidates, not runtime traces.
-Decision-point tables focus on the calls selected directly by an interface,
-branch, or dispatch; deeper dependencies stay in the call tree and function
-index.
+occurrence counts. Layer names come directly from the active rules, call
+resolution and control-flow details are rendered as tables, and unexported
+helper calls are omitted so the output stays readable without project-specific
+presentation rules baked into the binary. Interface implementations are static
+candidates, not runtime traces. The analysis tables focus on calls selected
+directly by an interface call, function value, conditional path, or keyed
+dispatch; deeper dependencies stay in the call tree and function index.
 
 ```markdown
 ## Translate
@@ -194,10 +194,12 @@ index.
   - usecase: 1 call
   - external_client: 1 call
   - repository: 1 call
-- decision points:
+- call resolution:
   - interface calls: 4
-  - branches: 0
-  - dispatches: 0
+  - function values: 0
+- control flow:
+  - conditional paths: 0
+  - keyed dispatches: 0
 
 ### call tree
 
@@ -243,7 +245,7 @@ index.
 | `c.l.Error` | `internal/controller/grpc/v1/translation.go:44` | 1 |
 | `Logger.Error` | `pkg/logger/logger.go:75` | 1 |
 
-### decision points
+### call resolution
 
 #### interface calls
 
@@ -256,8 +258,9 @@ index.
 ```
 
 JSON output keeps the raw trail data, including free-form layer names under
-`trail.layers`, interface candidate details under `trail.interface_calls`, and
-dispatch and branch details under `trail.dispatches` and `trail.branches`.
+`trail.layers`, interface and function-value details under
+`trail.interface_calls` and `trail.function_values`, and keyed-dispatch and
+conditional-path details under `trail.dispatches` and `trail.branches`.
 Error-code detection is kept in JSON because error handling is often
 project-specific and can be noisy in the Markdown summary:
 
