@@ -16,6 +16,10 @@ func buildFlow(fset *token.FileSet, source parsedSource, fn *ast.FuncDecl, index
 
 	ast.Inspect(fn.Body, func(node ast.Node) bool {
 		switch n := node.(type) {
+		case *ast.IfStmt:
+			recordIfBranchTrace(fset, source.displayPath, &flow, n, scope, index, 1, flow.Entrypoint.Symbol, opts.Depth, opts.Rules, source.stdlibPackageAliases)
+			traceIfCasesForFlow(fset, source.displayPath, &flow, n, scope, index, 1, "", opts.Depth, opts.Rules, source.stdlibPackageAliases)
+			return false
 		case *ast.SwitchStmt:
 			recordSwitchBranchTrace(fset, source.displayPath, &flow, n, scope, index, 1, flow.Entrypoint.Symbol, opts.Depth, opts.Rules, source.stdlibPackageAliases)
 		case *ast.TypeSwitchStmt:
@@ -29,7 +33,7 @@ func buildFlow(fset *token.FileSet, source parsedSource, fn *ast.FuncDecl, index
 				candidateDepth := 2
 				resolved := resolveCall(ref, scope, index, opts.Rules)
 				recordInterfaceCall(fset, &flow, ref, resolved, candidateDepth, opts.Depth)
-				recordDispatchCall(fset, &flow, ref, scope, index, candidateDepth, opts.Depth, opts.Rules)
+				recordDispatchCall(fset, &flow, n, ref, scope, index, candidateDepth, opts.Depth, opts.Rules)
 				if opts.Depth <= 1 {
 					return true
 				}
@@ -90,6 +94,10 @@ func traceFunctionCalls(
 	scope := newScope(fset, info.fn, index, info.packageName, info.receiverType, info.receiverVar)
 	ast.Inspect(info.fn.Body, func(node ast.Node) bool {
 		switch n := node.(type) {
+		case *ast.IfStmt:
+			recordIfBranchTrace(fset, info.file, flow, n, scope, index, currentDepth, implementationSymbol(info), maxDepth, ruleSet, info.stdlibPackageAliases)
+			traceIfCasesForFlow(fset, info.file, flow, n, scope, index, currentDepth, via, maxDepth, ruleSet, info.stdlibPackageAliases)
+			return false
 		case *ast.SwitchStmt:
 			recordSwitchBranchTrace(fset, info.file, flow, n, scope, index, currentDepth, implementationSymbol(info), maxDepth, ruleSet, info.stdlibPackageAliases)
 		case *ast.TypeSwitchStmt:
@@ -105,7 +113,7 @@ func traceFunctionCalls(
 			candidateDepth := currentDepth + 1
 			resolved := resolveCall(ref, scope, index, ruleSet)
 			recordInterfaceCall(fset, flow, ref, resolved, candidateDepth, maxDepth)
-			recordDispatchCall(fset, flow, ref, scope, index, candidateDepth, maxDepth, ruleSet)
+			recordDispatchCall(fset, flow, n, ref, scope, index, candidateDepth, maxDepth, ruleSet)
 			if currentDepth >= maxDepth {
 				return true
 			}

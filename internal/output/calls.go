@@ -63,6 +63,20 @@ func visibleLayerCalls(calls []model.CallRef) []model.CallRef {
 	return sortCalls(out)
 }
 
+func visibleDecisionLayerCalls(calls []model.CallRef) []model.CallRef {
+	calls = dedupeCalls(calls)
+	hidden := implementationCallsiteKeys(calls)
+
+	var out []model.CallRef
+	for _, call := range calls {
+		if hidden[callKey(call)] {
+			continue
+		}
+		out = append(out, call)
+	}
+	return sortCalls(out)
+}
+
 func implementationCallsiteKeys(calls []model.CallRef) map[string]bool {
 	hidden := make(map[string]bool)
 	for _, parent := range calls {
@@ -88,6 +102,10 @@ func visibleUnknownCalls(calls []model.CallRef) []model.CallRef {
 		out = append(out, call)
 	}
 	return sortCalls(dedupeCalls(out))
+}
+
+func visibleDecisionUnknownCalls(calls []model.CallRef) []model.CallRef {
+	return sortCalls(dedupeCalls(calls))
 }
 
 func isInternalHelperCall(call model.CallRef) bool {

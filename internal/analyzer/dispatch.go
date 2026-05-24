@@ -30,37 +30,52 @@ type dispatchLookupInfo struct {
 
 func collectDispatchTables(fset *token.FileSet, packageName string, file *ast.File, index *projectIndex) {
 	ast.Inspect(file, func(node ast.Node) bool {
-		lit, ok := node.(*ast.CompositeLit)
-		if !ok {
-			return true
-		}
-		ownerType := typeKey(packageName, typeString(lit.Type))
-		if ownerType == "" {
-			return true
-		}
-		for _, elt := range lit.Elts {
-			field, mapLit, ok := dispatchFieldMapLiteral(elt)
-			if !ok {
-				continue
-			}
-			table := dispatchTableInfo{
-				OwnerType: ownerType,
-				FieldName: field,
-				ValueType: mapLiteralValueType(mapLit),
-			}
-			for _, mapElt := range mapLit.Elts {
-				tableCase, ok := dispatchMapCase(fset, mapElt, *index)
-				if !ok {
-					continue
-				}
-				table.Cases = append(table.Cases, tableCase)
-			}
-			if len(table.Cases) > 0 {
-				addDispatchTable(index, table)
-			}
+		switch n := node.(type) {
+		case *ast.ValueSpec:
+			collectPackageDispatchTables(fset, packageName, n, index)
+		case *ast.CompositeLit:
+			collectStructDispatchTables(fset, packageName, n, index)
 		}
 		return true
 	})
+}
+
+func collectPackageDispatchTables(fset *token.FileSet, packageName string, spec *ast.ValueSpec, index *projectIndex) {
+	for i, name := range spec.Names {
+		if i >= len(spec.Values) {
+			continue
+		}
+		mapLit, ok := spec.Values[i].(*ast.CompositeLit)
+		if !ok {
+			continue
+		}
+		table := dispatchTableFromMapLiteral(fset, mapLit, *index)
+		if len(table.Cases) == 0 {
+			continue
+		}
+		table.FieldName = name.Name
+		addPackageDispatchTable(index, packageName, name.Name, table)
+	}
+}
+
+func collectStructDispatchTables(fset *token.FileSet, packageName string, lit *ast.CompositeLit, index *projectIndex) {
+	ownerType := typeKey(packageName, typeString(lit.Type))
+	if ownerType == "" {
+		return
+	}
+	for _, elt := range lit.Elts {
+		field, mapLit, ok := dispatchFieldMapLiteral(elt)
+		if !ok {
+			continue
+		}
+		table := dispatchTableFromMapLiteral(fset, mapLit, *index)
+		if len(table.Cases) == 0 {
+			continue
+		}
+		table.OwnerType = ownerType
+		table.FieldName = field
+		addDispatchTable(index, table)
+	}
 }
 
 func dispatchFieldMapLiteral(expr ast.Expr) (string, *ast.CompositeLit, bool) {
@@ -80,6 +95,21 @@ func dispatchFieldMapLiteral(expr ast.Expr) (string, *ast.CompositeLit, bool) {
 		return "", nil, false
 	}
 	return field.Name, mapLit, true
+}
+
+func dispatchTableFromMapLiteral(fset *token.FileSet, mapLit *ast.CompositeLit, index projectIndex) dispatchTableInfo {
+	table := dispatchTableInfo{ValueType: mapLiteralValueType(mapLit)}
+	if table.ValueType == "" {
+		return dispatchTableInfo{}
+	}
+	for _, mapElt := range mapLit.Elts {
+		tableCase, ok := dispatchMapCase(fset, mapElt, index)
+		if !ok {
+			continue
+		}
+		table.Cases = append(table.Cases, tableCase)
+	}
+	return table
 }
 
 func mapLiteralValueType(lit *ast.CompositeLit) string {
@@ -198,6 +228,13 @@ func addDispatchTable(index *projectIndex, table dispatchTableInfo) {
 	}
 }
 
+func addPackageDispatchTable(index *projectIndex, packageName string, name string, table dispatchTableInfo) {
+	addDispatchTableByKey(index, packageDispatchTableKey(packageName, name), table)
+	if _, exists := index.dispatchTables[name]; !exists {
+		addDispatchTableByKey(index, name, table)
+	}
+}
+
 func addDispatchTableByKey(index *projectIndex, key string, table dispatchTableInfo) {
 	existing := index.dispatchTables[key]
 	if existing.OwnerType == "" {
@@ -234,6 +271,67 @@ func dispatchTableCaseKey(tableCase dispatchTableCase) string {
 
 func dispatchTableKey(ownerType string, fieldName string) string {
 	return baseType(ownerType) + "." + fieldName
+}
+
+func packageDispatchTableKey(packageName string, name string) string {
+	if packageName == "" {
+		return name
+	}
+	return packageName + "." + name
+}
+
+func collectLocalDispatchTables(fset *token.FileSet, body *ast.BlockStmt, index projectIndex) map[string]dispatchTableInfo {
+	out := make(map[string]dispatchTableInfo)
+	if body == nil {
+		return out
+	}
+	ast.Inspect(body, func(node ast.Node) bool {
+		switch n := node.(type) {
+		case *ast.AssignStmt:
+			if len(n.Rhs) == 1 {
+				bindLocalDispatchTable(fset, out, n.Lhs[:1], n.Rhs[0], index)
+				return true
+			}
+			for i, rhs := range n.Rhs {
+				if i >= len(n.Lhs) {
+					continue
+				}
+				bindLocalDispatchTable(fset, out, n.Lhs[i:i+1], rhs, index)
+			}
+		case *ast.ValueSpec:
+			for i, value := range n.Values {
+				if i >= len(n.Names) {
+					continue
+				}
+				bindLocalDispatchTable(fset, out, []ast.Expr{n.Names[i]}, value, index)
+			}
+		}
+		return true
+	})
+	return out
+}
+
+func bindLocalDispatchTable(
+	fset *token.FileSet,
+	out map[string]dispatchTableInfo,
+	lhs []ast.Expr,
+	rhs ast.Expr,
+	index projectIndex,
+) {
+	mapLit, ok := rhs.(*ast.CompositeLit)
+	if !ok || len(lhs) == 0 {
+		return
+	}
+	name, ok := lhs[0].(*ast.Ident)
+	if !ok || name.Name == "_" {
+		return
+	}
+	table := dispatchTableFromMapLiteral(fset, mapLit, index)
+	if len(table.Cases) == 0 {
+		return
+	}
+	table.FieldName = name.Name
+	out[name.Name] = table
 }
 
 func collectLocalDispatches(fset *token.FileSet, body *ast.BlockStmt, index projectIndex, scope scopeInfo) map[string]dispatchLookupInfo {
@@ -291,19 +389,38 @@ func dispatchLookupForExpr(fset *token.FileSet, expr ast.Expr, index projectInde
 	if !ok {
 		return dispatchLookupInfo{}, false
 	}
-	tableKey, ok := dispatchLookupTableKey(indexExpr.X, scope)
+	if table, ok := dispatchLookupTable(indexExpr.X, index, scope); ok {
+		return dispatchLookupInfo{
+			Table: nodeString(fset, indexExpr.X),
+			Key:   nodeString(fset, indexExpr.Index),
+			Info:  table,
+		}, true
+	}
+	return dispatchLookupInfo{}, false
+}
+
+func dispatchLookupTable(expr ast.Expr, index projectIndex, scope scopeInfo) (dispatchTableInfo, bool) {
+	if ident, ok := expr.(*ast.Ident); ok {
+		if table, ok := scope.localDispatchTables[ident.Name]; ok && len(table.Cases) > 0 {
+			return table, true
+		}
+		for _, key := range []string{packageDispatchTableKey(scope.packageName, ident.Name), ident.Name} {
+			table, ok := index.dispatchTables[key]
+			if ok && len(table.Cases) > 0 {
+				return table, true
+			}
+		}
+		return dispatchTableInfo{}, false
+	}
+	tableKey, ok := dispatchLookupTableKey(expr, scope)
 	if !ok {
-		return dispatchLookupInfo{}, false
+		return dispatchTableInfo{}, false
 	}
 	table, ok := index.dispatchTables[tableKey]
 	if !ok || len(table.Cases) == 0 {
-		return dispatchLookupInfo{}, false
+		return dispatchTableInfo{}, false
 	}
-	return dispatchLookupInfo{
-		Table: nodeString(fset, indexExpr.X),
-		Key:   nodeString(fset, indexExpr.Index),
-		Info:  table,
-	}, true
+	return table, true
 }
 
 func dispatchLookupTableKey(expr ast.Expr, scope scopeInfo) (string, bool) {
@@ -321,6 +438,7 @@ func dispatchLookupTableKey(expr ast.Expr, scope scopeInfo) (string, bool) {
 func recordDispatchCall(
 	fset *token.FileSet,
 	flow *model.APIFlow,
+	call *ast.CallExpr,
 	ref model.CallRef,
 	scope scopeInfo,
 	index projectIndex,
@@ -331,6 +449,10 @@ func recordDispatchCall(
 	if candidateDepth > maxDepth {
 		return
 	}
+	if directRef, lookup, ok := directDispatchLookupCall(fset, call, ref, index, scope); ok {
+		recordDispatchTrace(fset, flow, directRef, lookup, index, candidateDepth, maxDepth, ruleSet)
+		return
+	}
 	if ref.Receiver == "" || ref.Method == "" {
 		return
 	}
@@ -338,6 +460,42 @@ func recordDispatchCall(
 	if !ok {
 		return
 	}
+	recordDispatchTrace(fset, flow, ref, lookup, index, candidateDepth, maxDepth, ruleSet)
+}
+
+func directDispatchLookupCall(
+	fset *token.FileSet,
+	call *ast.CallExpr,
+	ref model.CallRef,
+	index projectIndex,
+	scope scopeInfo,
+) (model.CallRef, dispatchLookupInfo, bool) {
+	selector, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return model.CallRef{}, dispatchLookupInfo{}, false
+	}
+	lookup, ok := dispatchLookupForExpr(fset, selector.X, index, scope)
+	if !ok {
+		return model.CallRef{}, dispatchLookupInfo{}, false
+	}
+	if receiver := nodeString(fset, selector.X); receiver != "" {
+		ref.Receiver = receiver
+		ref.Symbol = receiver + "." + selector.Sel.Name
+	}
+	ref.Method = selector.Sel.Name
+	return ref, lookup, true
+}
+
+func recordDispatchTrace(
+	fset *token.FileSet,
+	flow *model.APIFlow,
+	ref model.CallRef,
+	lookup dispatchLookupInfo,
+	index projectIndex,
+	candidateDepth int,
+	maxDepth int,
+	ruleSet rules.RuleSet,
+) {
 	trace := model.DispatchTrace{
 		Table:     lookup.Table,
 		Key:       lookup.Key,
