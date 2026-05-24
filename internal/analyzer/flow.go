@@ -24,6 +24,7 @@ func buildFlow(fset *token.FileSet, source parsedSource, fn *ast.FuncDecl, index
 			return false
 		case *ast.CallExpr:
 			ref, ok := recordCall(fset, source.displayPath, &flow, n, scope, index, 1, "", opts.Rules, source.stdlibPackageAliases)
+			traceFunctionValueArgsForFlow(fset, source.displayPath, &flow, n, scope, index, 1, "", opts.Depth, opts.Rules, source.stdlibPackageAliases)
 			if ok {
 				candidateDepth := 2
 				resolved := resolveCall(ref, scope, index, opts.Rules)
@@ -97,6 +98,7 @@ func traceFunctionCalls(
 			return false
 		case *ast.CallExpr:
 			ref, added := recordCall(fset, info.file, flow, n, scope, index, currentDepth, via, ruleSet, info.stdlibPackageAliases)
+			traceFunctionValueArgsForFlow(fset, info.file, flow, n, scope, index, currentDepth, via, maxDepth, ruleSet, info.stdlibPackageAliases)
 			if !added {
 				return true
 			}
@@ -190,6 +192,32 @@ func implementationRef(fset *token.FileSet, info functionInfo, via string, depth
 		Depth:    depth,
 		Via:      via,
 	}
+}
+
+func traceFunctionValueArgsForFlow(
+	fset *token.FileSet,
+	file string,
+	flow *model.APIFlow,
+	call *ast.CallExpr,
+	scope scopeInfo,
+	index projectIndex,
+	depth int,
+	via string,
+	maxDepth int,
+	ruleSet rules.RuleSet,
+	stdlibPackageAliases map[string]bool,
+) {
+	traceFunctionValueArgs(fset, file, call, scope, index, depth, via, maxDepth, ruleSet, stdlibPackageAliases, functionValueTraceSink{
+		recordFunctionValue: func(trace model.FunctionValueTrace) {
+			flow.Trail.FunctionValues = appendFunctionValueTrace(flow.Trail.FunctionValues, trace)
+		},
+		recordImplementation: func(info functionInfo, via string, depth int) {
+			recordImplementation(fset, flow, info, via, depth, ruleSet)
+		},
+		traceImplementation: func(info functionInfo, depth int, via string) {
+			traceFunctionCalls(fset, flow, info, index, depth, via, maxDepth, ruleSet)
+		},
+	})
 }
 
 func appendCall(flow *model.APIFlow, ref model.CallRef, layer string) {

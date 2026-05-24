@@ -17,7 +17,8 @@ func WriteMarkdown(w io.Writer, flows []model.APIFlow) error {
 		writeExecutionSummary(w, flow)
 		writeCallTree(w, flow)
 		writeFunctionIndex(w, flow)
-		writeDecisionPoints(w, flow)
+		writeCallResolution(w, flow)
+		writeControlFlow(w, flow)
 	}
 	return nil
 }
@@ -41,11 +42,15 @@ func writeExecutionSummary(w io.Writer, flow model.APIFlow) {
 		}
 	}
 
-	interfaceCalls, branches, dispatches := decisionPointCounts(flow)
-	fmt.Fprintln(w, "- decision points:")
+	interfaceCalls, functionValues := callResolutionCounts(flow)
+	fmt.Fprintln(w, "- call resolution:")
 	fmt.Fprintf(w, "  - interface calls: %d\n", interfaceCalls)
-	fmt.Fprintf(w, "  - branches: %d\n", branches)
-	fmt.Fprintf(w, "  - dispatches: %d\n\n", dispatches)
+	fmt.Fprintf(w, "  - function values: %d\n", functionValues)
+
+	conditionalPaths, keyedDispatches := controlFlowCounts(flow)
+	fmt.Fprintln(w, "- control flow:")
+	fmt.Fprintf(w, "  - conditional paths: %d\n", conditionalPaths)
+	fmt.Fprintf(w, "  - keyed dispatches: %d\n\n", keyedDispatches)
 }
 
 type layerCallCount struct {
@@ -65,26 +70,117 @@ func layerCallCounts(flow model.APIFlow) []layerCallCount {
 	return counts
 }
 
-func decisionPointCounts(flow model.APIFlow) (interfaceCalls int, branches int, dispatches int) {
+func callResolutionCounts(flow model.APIFlow) (interfaceCalls int, functionValues int) {
 	interfaceCalls = len(summarizeInterfaceCalls(flow.Trail.InterfaceCalls))
-	branches = len(flow.Trail.Branches)
-	dispatches = len(flow.Trail.Dispatches)
-	return interfaceCalls, branches, dispatches
+	functionValues = len(summarizeFunctionValues(collectFunctionValueTraces(flow)))
+	return interfaceCalls, functionValues
 }
 
-func writeDecisionPoints(w io.Writer, flow model.APIFlow) {
+func controlFlowCounts(flow model.APIFlow) (conditionalPaths int, keyedDispatches int) {
+	conditionalPaths = len(flow.Trail.Branches)
+	keyedDispatches = len(flow.Trail.Dispatches)
+	return conditionalPaths, keyedDispatches
+}
+
+func writeCallResolution(w io.Writer, flow model.APIFlow) {
 	hasInterfaceCalls := len(summarizeInterfaceCalls(flow.Trail.InterfaceCalls)) > 0
-	hasBranches := len(flow.Trail.Branches) > 0
-	hasDispatches := len(flow.Trail.Dispatches) > 0
-	if !hasInterfaceCalls && !hasBranches && !hasDispatches {
+	hasFunctionValues := len(summarizeFunctionValues(collectFunctionValueTraces(flow))) > 0
+	if !hasInterfaceCalls && !hasFunctionValues {
 		return
 	}
 
-	fmt.Fprintln(w, "### decision points")
+	fmt.Fprintln(w, "### call resolution")
 	fmt.Fprintln(w)
 	writeInterfaceCallsTable(w, flow.Trail.InterfaceCalls)
-	writeBranchesTable(w, flow.Trail.Branches)
-	writeDispatchesTable(w, flow.Trail.Dispatches)
+	writeFunctionValuesTable(w, flow)
+}
+
+func writeControlFlow(w io.Writer, flow model.APIFlow) {
+	hasConditionalPaths := len(flow.Trail.Branches) > 0
+	hasKeyedDispatches := len(flow.Trail.Dispatches) > 0
+	if !hasConditionalPaths && !hasKeyedDispatches {
+		return
+	}
+
+	fmt.Fprintln(w, "### control flow")
+	fmt.Fprintln(w)
+	writeConditionalPathsTable(w, flow.Trail.Branches)
+	writeKeyedDispatchesTable(w, flow.Trail.Dispatches)
+}
+
+func writeFunctionValuesTable(w io.Writer, flow model.APIFlow) {
+	traces := sortedFunctionValues(summarizeFunctionValues(collectFunctionValueTraces(flow)))
+	if len(traces) == 0 {
+		return
+	}
+
+	fmt.Fprintln(w, "#### function values")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "| wrapper | function value | resolved function | resolution |")
+	fmt.Fprintln(w, "| --- | --- | --- | --- |")
+	for _, trace := range traces {
+		fmt.Fprintf(
+			w,
+			"| %s | %s | %s | %s |\n",
+			tableCell(callReference(trace.Wrapper)),
+			tableCell(callReference(trace.Function)),
+			tableCell(interfaceCandidatesCell(trace.Implementations)),
+			tableCell(interfaceResolution(trace.Implementations)),
+		)
+	}
+	fmt.Fprintln(w)
+}
+
+func collectFunctionValueTraces(flow model.APIFlow) []model.FunctionValueTrace {
+	traces := append([]model.FunctionValueTrace(nil), flow.Trail.FunctionValues...)
+	for _, branch := range flow.Trail.Branches {
+		for _, branchCase := range branch.Cases {
+			traces = append(traces, branchCase.FunctionValues...)
+		}
+	}
+	for _, dispatch := range flow.Trail.Dispatches {
+		for _, dispatchCase := range dispatch.Cases {
+			traces = append(traces, dispatchCase.FunctionValues...)
+		}
+	}
+	return traces
+}
+
+func summarizeFunctionValues(traces []model.FunctionValueTrace) []model.FunctionValueTrace {
+	var out []model.FunctionValueTrace
+	seen := make(map[string]int, len(traces))
+	for _, trace := range traces {
+		key := functionValueKey(trace)
+		if existingIndex, ok := seen[key]; ok {
+			out[existingIndex].Implementations = appendImplementationCandidates(
+				out[existingIndex].Implementations,
+				trace.Implementations...,
+			)
+			continue
+		}
+		seen[key] = len(out)
+		trace.Implementations = appendImplementationCandidates(nil, trace.Implementations...)
+		out = append(out, trace)
+	}
+	return out
+}
+
+func sortedFunctionValues(traces []model.FunctionValueTrace) []model.FunctionValueTrace {
+	out := append([]model.FunctionValueTrace(nil), traces...)
+	for i := range out {
+		out[i].Implementations = sortImplementationCandidates(out[i].Implementations)
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if !sameCall(out[i].Wrapper, out[j].Wrapper) {
+			return callLess(out[i].Wrapper, out[j].Wrapper)
+		}
+		return callLess(out[i].Function, out[j].Function)
+	})
+	return out
+}
+
+func functionValueKey(trace model.FunctionValueTrace) string {
+	return callKey(trace.Wrapper) + "\x00" + callKey(trace.Function)
 }
 
 func writeInterfaceCallsTable(w io.Writer, calls []model.InterfaceCallTrace) {
@@ -186,14 +282,14 @@ func hasOnlyInternalHelperImplementations(trace model.InterfaceCallTrace) bool {
 	return true
 }
 
-func writeBranchesTable(w io.Writer, branches []model.BranchTrace) {
+func writeConditionalPathsTable(w io.Writer, branches []model.BranchTrace) {
 	if len(branches) == 0 {
 		return
 	}
 
-	fmt.Fprintln(w, "#### branches")
+	fmt.Fprintln(w, "#### conditional paths")
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, "| function | condition | case | calls |")
+	fmt.Fprintln(w, "| function | condition | path | calls |")
 	fmt.Fprintln(w, "| --- | --- | --- | --- |")
 	for _, branch := range branches {
 		for _, branchCase := range branch.Cases {
@@ -283,14 +379,14 @@ func branchCaseTitle(branchCase model.BranchCase) string {
 	return "case " + inlineCodeList(branchCase.Labels)
 }
 
-func writeDispatchesTable(w io.Writer, dispatches []model.DispatchTrace) {
+func writeKeyedDispatchesTable(w io.Writer, dispatches []model.DispatchTrace) {
 	if len(dispatches) == 0 {
 		return
 	}
 
-	fmt.Fprintln(w, "#### dispatches")
+	fmt.Fprintln(w, "#### keyed dispatches")
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, "| dispatch | case | calls |")
+	fmt.Fprintln(w, "| lookup | case | calls |")
 	fmt.Fprintln(w, "| --- | --- | --- |")
 	for _, dispatch := range dispatches {
 		for _, dispatchCase := range dispatch.Cases {
@@ -388,6 +484,26 @@ func sortImplementationCandidates(candidates []model.ImplementationCandidate) []
 		return callLess(out[i].Call, out[j].Call)
 	})
 	return out
+}
+
+func appendImplementationCandidates(
+	candidates []model.ImplementationCandidate,
+	more ...model.ImplementationCandidate,
+) []model.ImplementationCandidate {
+	seen := make(map[string]int, len(candidates)+len(more))
+	for i, candidate := range candidates {
+		seen[callKey(candidate.Call)] = i
+	}
+	for _, candidate := range more {
+		key := callKey(candidate.Call)
+		if existingIndex, ok := seen[key]; ok {
+			candidates[existingIndex].Expanded = candidates[existingIndex].Expanded || candidate.Expanded
+			continue
+		}
+		seen[key] = len(candidates)
+		candidates = append(candidates, candidate)
+	}
+	return candidates
 }
 
 func sortCalls(calls []model.CallRef) []model.CallRef {

@@ -13,6 +13,10 @@ func isHandler(fn *ast.FuncDecl, packageName string, file string, handlerRules r
 		!matchesAnyContains(file, handlerRules.Match.FilePathContains) {
 		return false
 	}
+	if matchesAnyEqual(packageName, handlerRules.Exclude.PackageNames) ||
+		matchesAnyContains(file, handlerRules.Exclude.FilePathContains) {
+		return false
+	}
 	if fn.Recv == nil || fn.Type.Params == nil || fn.Type.Results == nil {
 		return false
 	}

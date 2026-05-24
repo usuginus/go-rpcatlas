@@ -107,6 +107,7 @@ func traceBranchCaseCalls(
 				return false
 			case *ast.CallExpr:
 				ref, added := recordBranchCall(fset, file, branchCase, n, scope, index, depth, via, ruleSet, stdlibPackageAliases)
+				traceFunctionValueArgsForBranchCase(fset, file, branchCase, n, scope, index, depth, via, maxDepth, ruleSet, stdlibPackageAliases)
 				if !added || depth >= maxDepth {
 					return true
 				}
@@ -143,6 +144,7 @@ func traceFunctionCallsForBranchCase(
 			return false
 		case *ast.CallExpr:
 			ref, added := recordBranchCall(fset, info.file, branchCase, n, scope, index, currentDepth, via, ruleSet, info.stdlibPackageAliases)
+			traceFunctionValueArgsForBranchCase(fset, info.file, branchCase, n, scope, index, currentDepth, via, maxDepth, ruleSet, info.stdlibPackageAliases)
 			if !added || currentDepth >= maxDepth {
 				return true
 			}
@@ -205,6 +207,7 @@ func traceCaseCallsForFlow(
 				return false
 			case *ast.CallExpr:
 				ref, added := recordCall(fset, file, flow, n, scope, index, depth, via, ruleSet, stdlibPackageAliases)
+				traceFunctionValueArgsForFlow(fset, file, flow, n, scope, index, depth, via, maxDepth, ruleSet, stdlibPackageAliases)
 				if !added || depth >= maxDepth {
 					return true
 				}
@@ -220,6 +223,32 @@ func traceCaseCallsForFlow(
 			return true
 		})
 	}
+}
+
+func traceFunctionValueArgsForBranchCase(
+	fset *token.FileSet,
+	file string,
+	branchCase *model.BranchCase,
+	call *ast.CallExpr,
+	scope scopeInfo,
+	index projectIndex,
+	depth int,
+	via string,
+	maxDepth int,
+	ruleSet rules.RuleSet,
+	stdlibPackageAliases map[string]bool,
+) {
+	traceFunctionValueArgs(fset, file, call, scope, index, depth, via, maxDepth, ruleSet, stdlibPackageAliases, functionValueTraceSink{
+		recordFunctionValue: func(trace model.FunctionValueTrace) {
+			branchCase.FunctionValues = appendFunctionValueTrace(branchCase.FunctionValues, trace)
+		},
+		recordImplementation: func(info functionInfo, via string, depth int) {
+			recordBranchImplementation(fset, branchCase, info, via, depth, ruleSet)
+		},
+		traceImplementation: func(info functionInfo, depth int, via string) {
+			traceFunctionCallsForBranchCase(fset, branchCase, info, index, depth, via, maxDepth, ruleSet)
+		},
+	})
 }
 
 func recordBranchCall(
@@ -266,7 +295,7 @@ func caseLabels(fset *token.FileSet, expressions []ast.Expr) []string {
 }
 
 func branchCaseHasCalls(branchCase model.BranchCase) bool {
-	return len(branchCase.Layers) > 0 || len(branchCase.Unknown) > 0
+	return len(branchCase.Layers) > 0 || len(branchCase.FunctionValues) > 0 || len(branchCase.Unknown) > 0
 }
 
 func appendBranchTrace(flow *model.APIFlow, trace model.BranchTrace) {

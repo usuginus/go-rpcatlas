@@ -6,6 +6,12 @@ handlers:
       - grpc
     file_path_contains:
       - /grpc/
+  exclude:
+    file_path_contains:
+      - /client/grpc/
+      - /clients/grpc/
+      - /grpc/client/
+      - /grpc/clients/
   signature:
     require_context_first_arg: true
     require_pointer_request: true

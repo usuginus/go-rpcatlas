@@ -22,6 +22,7 @@ type parsedSource struct {
 	file                 *ast.File
 	packageName          string
 	fieldTypes           map[string]map[string]string
+	fieldOrder           map[string][]string
 	stdlibPackageAliases map[string]bool
 }
 
@@ -66,6 +67,7 @@ func parseSource(fset *token.FileSet, file sourceFile, stdlibImports map[string]
 		file:                 parsedFile,
 		packageName:          parsedFile.Name.Name,
 		fieldTypes:           collectStructFieldTypes(parsedFile),
+		fieldOrder:           collectStructFieldOrder(parsedFile),
 		stdlibPackageAliases: collectStdlibPackageAliases(parsedFile, stdlibImports),
 	}, nil
 }
