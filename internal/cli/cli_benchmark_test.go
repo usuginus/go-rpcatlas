@@ -18,11 +18,11 @@ func BenchmarkRunListMapDispatch(b *testing.B) {
 	}
 }
 
-func BenchmarkRunMarkdownMapDispatch(b *testing.B) {
+func BenchmarkRunAlphaMapDispatch(b *testing.B) {
 	args := []string{
 		"../../examples/map-dispatch",
 		"--config", "../../examples/map-dispatch/.calltrail.yaml",
-		"--rpc", "ProcessDocument",
+		"--rpc", "ProcessFoo",
 		"--depth", "4",
 	}
 	for i := 0; i < b.N; i++ {
@@ -36,7 +36,7 @@ func BenchmarkRunJSONMapDispatch(b *testing.B) {
 	args := []string{
 		"../../examples/map-dispatch",
 		"--config", "../../examples/map-dispatch/.calltrail.yaml",
-		"--rpc", "ProcessDocument",
+		"--rpc", "ProcessFoo",
 		"--depth", "4",
 		"--format", "json",
 	}

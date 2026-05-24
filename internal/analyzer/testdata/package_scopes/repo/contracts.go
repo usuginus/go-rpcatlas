@@ -2,10 +2,10 @@ package repo
 
 import "context"
 
-type TranslationRepo interface {
+type AlphaStore interface {
 	Store(context.Context, string) error
 }
 
-type UserRepo interface {
+type BetaStore interface {
 	Store(context.Context, string) error
 }

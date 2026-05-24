@@ -2,8 +2,8 @@ package transport
 
 import "context"
 
-type articleStore struct{}
+type fooStore struct{}
 
-func (s *articleStore) Insert(ctx context.Context, cmd PublishArticleCommand) (string, error) {
-	return "article_123", nil
+func (s *fooStore) Insert(ctx context.Context, cmd ProcessFooCommand) (string, error) {
+	return "foo_123", nil
 }

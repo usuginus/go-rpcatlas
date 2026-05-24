@@ -2,9 +2,9 @@ package transport
 
 import "errors"
 
-type articlePolicy struct{}
+type fooPolicy struct{}
 
-func (p *articlePolicy) Validate(cmd PublishArticleCommand) error {
+func (p *fooPolicy) Validate(cmd ProcessFooCommand) error {
 	if cmd.Title == "" {
 		return errors.New("title is required")
 	}

@@ -3,23 +3,23 @@ package grpc
 import "context"
 
 type Server struct {
-	catalogUsecase CatalogUsecase
-	bookConverter  bookConverter
+	fooUsecase   FooUsecase
+	fooConverter fooConverter
 }
 
-type GetBookRequest struct {
-	BookID string
+type GetFooRequest struct {
+	FooID string
 }
 
-type BookResponse struct {
+type FooResponse struct {
 	ID    string
 	Title string
 }
 
-func (s *Server) GetBook(ctx context.Context, req *GetBookRequest) (*BookResponse, error) {
-	book, err := s.catalogUsecase.GetBook(ctx, req.BookID)
+func (s *Server) GetFoo(ctx context.Context, req *GetFooRequest) (*FooResponse, error) {
+	foo, err := s.fooUsecase.GetFoo(ctx, req.FooID)
 	if err != nil {
 		return nil, err
 	}
-	return s.bookConverter.ToResponse(book), nil
+	return s.fooConverter.ToResponse(foo), nil
 }

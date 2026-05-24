@@ -2,33 +2,33 @@ package transport
 
 import "context"
 
-type ArticleApplication interface {
-	PublishArticle(context.Context, PublishArticleCommand) (string, error)
+type FooApplication interface {
+	ProcessFoo(context.Context, ProcessFooCommand) (string, error)
 }
 
-type PublishArticleCommand struct {
+type ProcessFooCommand struct {
 	Title string
 	Body  string
 }
 
-type articleApplication struct {
-	policy *articlePolicy
-	store  *articleStore
-	index  *searchIndexClient
+type fooApplication struct {
+	policy *fooPolicy
+	store  *fooStore
+	index  *externalClient
 }
 
-var _ ArticleApplication = (*articleApplication)(nil)
+var _ FooApplication = (*fooApplication)(nil)
 
-func (a *articleApplication) PublishArticle(ctx context.Context, cmd PublishArticleCommand) (string, error) {
+func (a *fooApplication) ProcessFoo(ctx context.Context, cmd ProcessFooCommand) (string, error) {
 	if err := a.policy.Validate(cmd); err != nil {
 		return "", err
 	}
-	articleID, err := a.store.Insert(ctx, cmd)
+	fooID, err := a.store.Insert(ctx, cmd)
 	if err != nil {
 		return "", err
 	}
-	if err := a.index.Index(ctx, articleID); err != nil {
+	if err := a.index.Index(ctx, fooID); err != nil {
 		return "", err
 	}
-	return articleID, nil
+	return fooID, nil
 }

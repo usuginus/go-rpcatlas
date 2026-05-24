@@ -2,8 +2,8 @@ package transport
 
 import "context"
 
-type documentStore struct{}
+type fooStore struct{}
 
-func (s *documentStore) SaveMarkdown(ctx context.Context, cmd ProcessDocumentCommand) (string, error) {
-	return "markdown-document", nil
+func (s *fooStore) SaveAlpha(ctx context.Context, cmd ProcessFooCommand) (string, error) {
+	return "alpha-foo", nil
 }

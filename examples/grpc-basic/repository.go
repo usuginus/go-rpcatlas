@@ -2,16 +2,16 @@ package grpc
 
 import "context"
 
-type bookRepository struct{}
+type fooRepository struct{}
 
-type Book struct {
+type Foo struct {
 	ID    string
 	Title string
 }
 
-func (r *bookRepository) FindBook(ctx context.Context, bookID string) (*Book, error) {
-	return &Book{
-		ID:    bookID,
-		Title: "The Go Programming Language",
+func (r *fooRepository) FindFoo(ctx context.Context, fooID string) (*Foo, error) {
+	return &Foo{
+		ID:    fooID,
+		Title: "example",
 	}, nil
 }

@@ -2,26 +2,26 @@ package transport
 
 import "errors"
 
-type documentPolicy struct{}
+type fooPolicy struct{}
 
-func (p *documentPolicy) ValidateMarkdown(asset MarkdownAsset) error {
-	if asset.Body == "" {
+func (p *fooPolicy) ValidateAlpha(payload AlphaPayload) error {
+	if payload.Body == "" {
 		return errors.New("body is required")
 	}
 	return nil
 }
 
-func (p *documentPolicy) ValidateImage(asset ImageAsset) error {
-	if asset.URL == "" {
+func (p *fooPolicy) ValidateBeta(payload BetaPayload) error {
+	if payload.URL == "" {
 		return errors.New("URL is required")
 	}
 	return nil
 }
 
-func (p *documentPolicy) RejectUnsupportedAsset() error {
-	return errors.New("unsupported asset")
+func (p *fooPolicy) RejectUnsupportedPayload() error {
+	return errors.New("unsupported payload")
 }
 
-func (p *documentPolicy) RejectUnsupportedMode(mode string) error {
+func (p *fooPolicy) RejectUnsupportedMode(mode string) error {
 	return errors.New("unsupported mode")
 }

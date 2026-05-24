@@ -22,7 +22,7 @@ layers:
     match:
       receiver_type_contains:
         - Policy
-        - Asset
+        - Payload
 
   - name: persistence
     match:

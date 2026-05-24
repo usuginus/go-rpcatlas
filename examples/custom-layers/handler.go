@@ -3,25 +3,25 @@ package transport
 import "context"
 
 type Service struct {
-	articleApplication ArticleApplication
+	fooApplication FooApplication
 }
 
-type PublishArticleRequest struct {
+type ProcessFooRequest struct {
 	Title string
 	Body  string
 }
 
-type PublishArticleResponse struct {
-	ArticleID string
+type ProcessFooResponse struct {
+	FooID string
 }
 
-func (s *Service) PublishArticle(ctx context.Context, req *PublishArticleRequest) (*PublishArticleResponse, error) {
-	articleID, err := s.articleApplication.PublishArticle(ctx, PublishArticleCommand{
+func (s *Service) ProcessFoo(ctx context.Context, req *ProcessFooRequest) (*ProcessFooResponse, error) {
+	fooID, err := s.fooApplication.ProcessFoo(ctx, ProcessFooCommand{
 		Title: req.Title,
 		Body:  req.Body,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &PublishArticleResponse{ArticleID: articleID}, nil
+	return &ProcessFooResponse{FooID: fooID}, nil
 }

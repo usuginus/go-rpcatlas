@@ -1,4 +1,4 @@
-package user
+package beta
 
 import (
 	"context"
@@ -7,9 +7,9 @@ import (
 )
 
 type UseCase struct {
-	repo repo.UserRepo
+	repo repo.BetaStore
 }
 
-func (uc *UseCase) Register(ctx context.Context, id string) error {
+func (uc *UseCase) Run(ctx context.Context, id string) error {
 	return uc.repo.Store(ctx, id)
 }

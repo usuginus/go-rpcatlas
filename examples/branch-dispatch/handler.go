@@ -3,25 +3,25 @@ package transport
 import "context"
 
 type Service struct {
-	documentApplication DocumentApplication
+	fooApplication FooApplication
 }
 
-type ProcessDocumentRequest struct {
-	Mode  string
-	Asset DocumentAsset
+type ProcessFooRequest struct {
+	Mode    string
+	Payload FooPayload
 }
 
-type ProcessDocumentResponse struct {
-	DocumentID string
+type ProcessFooResponse struct {
+	FooID string
 }
 
-func (s *Service) ProcessDocument(ctx context.Context, req *ProcessDocumentRequest) (*ProcessDocumentResponse, error) {
-	documentID, err := s.documentApplication.ProcessDocument(ctx, ProcessDocumentCommand{
-		Mode:  req.Mode,
-		Asset: req.Asset,
+func (s *Service) ProcessFoo(ctx context.Context, req *ProcessFooRequest) (*ProcessFooResponse, error) {
+	fooID, err := s.fooApplication.ProcessFoo(ctx, ProcessFooCommand{
+		Mode:    req.Mode,
+		Payload: req.Payload,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &ProcessDocumentResponse{DocumentID: documentID}, nil
+	return &ProcessFooResponse{FooID: fooID}, nil
 }

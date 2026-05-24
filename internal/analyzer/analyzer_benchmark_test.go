@@ -53,7 +53,7 @@ func BenchmarkAnalyzeMapDispatchDepth4(b *testing.B) {
 
 func BenchmarkAnalyzeMapDispatchRPCFilter(b *testing.B) {
 	ruleSet := mustLoadRules(b, "../../examples/map-dispatch/.calltrail.yaml")
-	opts := Options{RPC: "ProcessDocument", Depth: 4, Rules: ruleSet}
+	opts := Options{RPC: "ProcessFoo", Depth: 4, Rules: ruleSet}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		flows, err := Analyze([]string{"../../examples/map-dispatch"}, opts)
@@ -92,7 +92,7 @@ func BenchmarkDetectHandlersMapDispatch(b *testing.B) {
 
 func BenchmarkAnalyzePhasesMapDispatch(b *testing.B) {
 	ruleSet := mustLoadRules(b, "../../examples/map-dispatch/.calltrail.yaml")
-	opts := Options{RPC: "ProcessDocument", Depth: 4, Rules: ruleSet}
+	opts := Options{RPC: "ProcessFoo", Depth: 4, Rules: ruleSet}
 
 	b.Run("LoadSources", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {

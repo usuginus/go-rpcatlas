@@ -1,10 +1,10 @@
 package grpc
 
-type bookConverter struct{}
+type fooConverter struct{}
 
-func (bookConverter) ToResponse(book *Book) *BookResponse {
-	return &BookResponse{
-		ID:    book.ID,
-		Title: book.Title,
+func (fooConverter) ToResponse(foo *Foo) *FooResponse {
+	return &FooResponse{
+		ID:    foo.ID,
+		Title: foo.Title,
 	}
 }

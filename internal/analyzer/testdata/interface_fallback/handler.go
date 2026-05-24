@@ -3,19 +3,19 @@ package grpc
 import "context"
 
 type Server struct {
-	billing *billingUsecase
+	worker *workerUsecase
 }
 
 type Gateway interface {
-	Charge(context.Context, string) error
-	Refund(context.Context, string) error
+	Run(context.Context, string) error
+	Reset(context.Context, string) error
 }
 
-type billingUsecase struct {
+type workerUsecase struct {
 	gateway Gateway
 }
 
-type paymentGatewayClient struct{}
+type remoteGatewayClient struct{}
 
 var _ Gateway = (*FakeGateway)(nil)
 
@@ -23,25 +23,25 @@ type FakeGateway struct{}
 
 type pb struct{}
 
-func (pb) BillFooRequest() {}
+func (pb) RunFooRequest() {}
 
-func (pb) BillFooResponse() {}
+func (pb) RunFooResponse() {}
 
-func (s *Server) BillFoo(ctx context.Context, req *pb.BillFooRequest) (*pb.BillFooResponse, error) {
-	if err := s.billing.Bill(ctx, req.ID); err != nil {
+func (s *Server) RunFoo(ctx context.Context, req *pb.RunFooRequest) (*pb.RunFooResponse, error) {
+	if err := s.worker.Run(ctx, req.ID); err != nil {
 		return nil, err
 	}
-	return &pb.BillFooResponse{}, nil
+	return &pb.RunFooResponse{}, nil
 }
 
-func (b *billingUsecase) Bill(ctx context.Context, id string) error {
-	return b.gateway.Charge(ctx, id)
+func (w *workerUsecase) Run(ctx context.Context, id string) error {
+	return w.gateway.Run(ctx, id)
 }
 
-func (p *paymentGatewayClient) Charge(context.Context, string) error {
+func (p *remoteGatewayClient) Run(context.Context, string) error {
 	return nil
 }
 
-func (f *FakeGateway) Charge(context.Context, string) error {
+func (f *FakeGateway) Run(context.Context, string) error {
 	return nil
 }

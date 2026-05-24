@@ -2,75 +2,75 @@ package transport
 
 import "context"
 
-type DocumentApplication interface {
-	ProcessDocument(context.Context, ProcessDocumentCommand) (string, error)
+type FooApplication interface {
+	ProcessFoo(context.Context, ProcessFooCommand) (string, error)
 }
 
-type ProcessDocumentCommand struct {
-	Mode  string
-	Asset DocumentAsset
+type ProcessFooCommand struct {
+	Mode    string
+	Payload FooPayload
 }
 
-type DocumentAsset interface {
-	documentAsset()
+type FooPayload interface {
+	fooPayload()
 }
 
-type MarkdownAsset struct {
+type AlphaPayload struct {
 	Body string
 }
 
-func (MarkdownAsset) documentAsset() {}
+func (AlphaPayload) fooPayload() {}
 
-func (a MarkdownAsset) Normalize() string {
+func (a AlphaPayload) Normalize() string {
 	return a.Body
 }
 
-type ImageAsset struct {
+type BetaPayload struct {
 	URL string
 }
 
-func (ImageAsset) documentAsset() {}
+func (BetaPayload) fooPayload() {}
 
-func (a ImageAsset) Normalize() string {
+func (a BetaPayload) Normalize() string {
 	return a.URL
 }
 
-type documentApplication struct {
-	policy *documentPolicy
-	store  *documentStore
+type fooApplication struct {
+	policy *fooPolicy
+	store  *fooStore
 	index  *previewClient
 }
 
-var _ DocumentApplication = (*documentApplication)(nil)
+var _ FooApplication = (*fooApplication)(nil)
 
-func (a *documentApplication) ProcessDocument(ctx context.Context, cmd ProcessDocumentCommand) (string, error) {
-	switch asset := cmd.Asset.(type) {
-	case MarkdownAsset:
-		asset.Normalize()
-		if err := a.policy.ValidateMarkdown(asset); err != nil {
+func (a *fooApplication) ProcessFoo(ctx context.Context, cmd ProcessFooCommand) (string, error) {
+	switch payload := cmd.Payload.(type) {
+	case AlphaPayload:
+		payload.Normalize()
+		if err := a.policy.ValidateAlpha(payload); err != nil {
 			return "", err
 		}
-	case ImageAsset:
-		asset.Normalize()
-		if err := a.policy.ValidateImage(asset); err != nil {
+	case BetaPayload:
+		payload.Normalize()
+		if err := a.policy.ValidateBeta(payload); err != nil {
 			return "", err
 		}
 	default:
-		return "", a.policy.RejectUnsupportedAsset()
+		return "", a.policy.RejectUnsupportedPayload()
 	}
 
 	switch cmd.Mode {
 	case "draft":
 		return a.store.SaveDraft(ctx, cmd)
 	case "publish":
-		documentID, err := a.store.Publish(ctx, cmd)
+		fooID, err := a.store.Publish(ctx, cmd)
 		if err != nil {
 			return "", err
 		}
-		if err := a.index.Index(ctx, documentID); err != nil {
+		if err := a.index.Index(ctx, fooID); err != nil {
 			return "", err
 		}
-		return documentID, nil
+		return fooID, nil
 	default:
 		return "", a.policy.RejectUnsupportedMode(cmd.Mode)
 	}
