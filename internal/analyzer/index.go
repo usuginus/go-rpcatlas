@@ -23,6 +23,10 @@ type projectIndex struct {
 	interfaces               map[string]map[string]bool
 	implementationAssertions map[string]map[string]bool
 	structFields             map[string]map[string]string
+	structFieldOrder         map[string][]string
+	parameterConcreteTypes   map[string]map[string]map[string]bool
+	constructorFieldTypes    map[string]map[string]map[string]bool
+	concreteReturnTypes      map[string]map[string]bool
 	dispatchTables           map[string]dispatchTableInfo
 }
 
@@ -34,12 +38,17 @@ func buildProjectIndex(fset *token.FileSet, sources []parsedSource) projectIndex
 		interfaces:               make(map[string]map[string]bool),
 		implementationAssertions: make(map[string]map[string]bool),
 		structFields:             make(map[string]map[string]string),
+		structFieldOrder:         make(map[string][]string),
+		parameterConcreteTypes:   make(map[string]map[string]map[string]bool),
+		constructorFieldTypes:    make(map[string]map[string]map[string]bool),
+		concreteReturnTypes:      make(map[string]map[string]bool),
 		dispatchTables:           make(map[string]dispatchTableInfo),
 	}
 	for _, source := range sources {
 		collectInterfaces(source.packageName, source.file, index.interfaces)
 		collectImplementationAssertions(source.packageName, source.file, index.implementationAssertions)
 		addStructFields(source.packageName, source.fieldTypes, index.structFields)
+		addStructFieldOrder(source.packageName, source.fieldOrder, index.structFieldOrder)
 		for _, decl := range source.file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
 			if !ok {
@@ -68,11 +77,23 @@ func buildProjectIndex(fset *token.FileSet, sources []parsedSource) projectIndex
 	for _, source := range sources {
 		collectDispatchTables(fset, source.packageName, source.file, &index)
 	}
+	collectConcreteReturnTypes(sources, &index)
+	collectParameterConcreteTypes(sources, &index)
+	collectConstructorFieldTypes(sources, &index)
 	return index
 }
 
 func addStructFields(packageName string, fieldTypes map[string]map[string]string, out map[string]map[string]string) {
 	for name, fields := range fieldTypes {
+		out[typeKey(packageName, name)] = fields
+		if _, exists := out[name]; !exists {
+			out[name] = fields
+		}
+	}
+}
+
+func addStructFieldOrder(packageName string, fieldOrder map[string][]string, out map[string][]string) {
+	for name, fields := range fieldOrder {
 		out[typeKey(packageName, name)] = fields
 		if _, exists := out[name]; !exists {
 			out[name] = fields
@@ -137,7 +158,7 @@ func assertedConcreteType(expr ast.Expr) string {
 	if !ok {
 		return ""
 	}
-	return baseType(typeString(star.X))
+	return typeString(star.X)
 }
 
 func collectInterfaces(packageName string, file *ast.File, interfaces map[string]map[string]bool) {
@@ -188,12 +209,52 @@ func collectStructFieldTypes(file *ast.File) map[string]map[string]string {
 			fields := make(map[string]string)
 			for _, field := range structType.Fields.List {
 				fieldType := typeString(field.Type)
-				for _, name := range field.Names {
-					fields[name.Name] = fieldType
+				for _, name := range structFieldNames(field) {
+					fields[name] = fieldType
 				}
 			}
 			out[typeSpec.Name.Name] = fields
 		}
 	}
 	return out
+}
+
+func collectStructFieldOrder(file *ast.File) map[string][]string {
+	out := make(map[string][]string)
+	for _, decl := range file.Decls {
+		gen, ok := decl.(*ast.GenDecl)
+		if !ok || gen.Tok != token.TYPE {
+			continue
+		}
+		for _, spec := range gen.Specs {
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+			structType, ok := typeSpec.Type.(*ast.StructType)
+			if !ok || structType.Fields == nil {
+				continue
+			}
+			var fields []string
+			for _, field := range structType.Fields.List {
+				fields = append(fields, structFieldNames(field)...)
+			}
+			out[typeSpec.Name.Name] = fields
+		}
+	}
+	return out
+}
+
+func structFieldNames(field *ast.Field) []string {
+	if len(field.Names) > 0 {
+		names := make([]string, 0, len(field.Names))
+		for _, name := range field.Names {
+			names = append(names, name.Name)
+		}
+		return names
+	}
+	if name := baseType(typeString(field.Type)); name != "" {
+		return []string{name}
+	}
+	return nil
 }

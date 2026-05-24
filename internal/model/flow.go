@@ -24,6 +24,7 @@ type TypeRef struct {
 
 type Trail struct {
 	Layers         []LayerCalls         `json:"layers,omitempty"`
+	FunctionValues []FunctionValueTrace `json:"function_values,omitempty"`
 	InterfaceCalls []InterfaceCallTrace `json:"interface_calls,omitempty"`
 	Dispatches     []DispatchTrace      `json:"dispatches,omitempty"`
 	Branches       []BranchTrace        `json:"branches,omitempty"`
@@ -48,10 +49,11 @@ type BranchTrace struct {
 }
 
 type BranchCase struct {
-	Labels  []string     `json:"labels,omitempty"`
-	Default bool         `json:"default,omitempty"`
-	Layers  []LayerCalls `json:"layers,omitempty"`
-	Unknown []CallRef    `json:"unknown,omitempty"`
+	Labels         []string             `json:"labels,omitempty"`
+	Default        bool                 `json:"default,omitempty"`
+	Layers         []LayerCalls         `json:"layers,omitempty"`
+	FunctionValues []FunctionValueTrace `json:"function_values,omitempty"`
+	Unknown        []CallRef            `json:"unknown,omitempty"`
 }
 
 type DispatchTrace struct {
@@ -63,9 +65,16 @@ type DispatchTrace struct {
 }
 
 type DispatchCase struct {
-	Labels  []string     `json:"labels,omitempty"`
-	Layers  []LayerCalls `json:"layers,omitempty"`
-	Unknown []CallRef    `json:"unknown,omitempty"`
+	Labels         []string             `json:"labels,omitempty"`
+	Layers         []LayerCalls         `json:"layers,omitempty"`
+	FunctionValues []FunctionValueTrace `json:"function_values,omitempty"`
+	Unknown        []CallRef            `json:"unknown,omitempty"`
+}
+
+type FunctionValueTrace struct {
+	Wrapper         CallRef                   `json:"wrapper"`
+	Function        CallRef                   `json:"function"`
+	Implementations []ImplementationCandidate `json:"implementations,omitempty"`
 }
 
 type InterfaceCallTrace struct {

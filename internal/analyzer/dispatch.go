@@ -393,6 +393,7 @@ func traceFunctionCallsForDispatchCase(
 			return false
 		case *ast.CallExpr:
 			ref, added := recordDispatchCaseCall(fset, info.file, dispatchCase, n, scope, index, currentDepth, via, ruleSet, info.stdlibPackageAliases)
+			traceFunctionValueArgsForDispatchCase(fset, info.file, dispatchCase, n, scope, index, currentDepth, via, maxDepth, ruleSet, info.stdlibPackageAliases)
 			if !added || currentDepth >= maxDepth {
 				return true
 			}
@@ -405,6 +406,32 @@ func traceFunctionCallsForDispatchCase(
 			}
 		}
 		return true
+	})
+}
+
+func traceFunctionValueArgsForDispatchCase(
+	fset *token.FileSet,
+	file string,
+	dispatchCase *model.DispatchCase,
+	call *ast.CallExpr,
+	scope scopeInfo,
+	index projectIndex,
+	depth int,
+	via string,
+	maxDepth int,
+	ruleSet rules.RuleSet,
+	stdlibPackageAliases map[string]bool,
+) {
+	traceFunctionValueArgs(fset, file, call, scope, index, depth, via, maxDepth, ruleSet, stdlibPackageAliases, functionValueTraceSink{
+		recordFunctionValue: func(trace model.FunctionValueTrace) {
+			dispatchCase.FunctionValues = appendFunctionValueTrace(dispatchCase.FunctionValues, trace)
+		},
+		recordImplementation: func(info functionInfo, via string, depth int) {
+			recordDispatchImplementation(fset, dispatchCase, info, via, depth, ruleSet)
+		},
+		traceImplementation: func(info functionInfo, depth int, via string) {
+			traceFunctionCallsForDispatchCase(fset, dispatchCase, info, index, depth, via, maxDepth, ruleSet)
+		},
 	})
 }
 
@@ -442,7 +469,7 @@ func appendDispatchCaseCall(dispatchCase *model.DispatchCase, ref model.CallRef,
 }
 
 func dispatchCaseHasCalls(dispatchCase model.DispatchCase) bool {
-	return len(dispatchCase.Layers) > 0 || len(dispatchCase.Unknown) > 0
+	return len(dispatchCase.Layers) > 0 || len(dispatchCase.FunctionValues) > 0 || len(dispatchCase.Unknown) > 0
 }
 
 func appendDispatchTrace(flow *model.APIFlow, trace model.DispatchTrace) {
@@ -468,6 +495,9 @@ func appendDispatchCases(cases []model.DispatchCase, more ...model.DispatchCase)
 		key := dispatchCaseKey(dispatchCase)
 		if existingIndex, ok := seen[key]; ok {
 			cases[existingIndex].Layers = append(cases[existingIndex].Layers, dispatchCase.Layers...)
+			for _, functionValue := range dispatchCase.FunctionValues {
+				cases[existingIndex].FunctionValues = appendFunctionValueTrace(cases[existingIndex].FunctionValues, functionValue)
+			}
 			cases[existingIndex].Unknown = append(cases[existingIndex].Unknown, dispatchCase.Unknown...)
 			continue
 		}

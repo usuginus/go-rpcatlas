@@ -19,10 +19,16 @@ type RuleSet struct {
 
 type HandlerRules struct {
 	Match     HandlerMatchRules
+	Exclude   HandlerExcludeRules
 	Signature HandlerSignatureRules
 }
 
 type HandlerMatchRules struct {
+	PackageNames     []string
+	FilePathContains []string
+}
+
+type HandlerExcludeRules struct {
 	PackageNames     []string
 	FilePathContains []string
 }
@@ -115,6 +121,8 @@ func (r RuleSet) IsZero() bool {
 func (r HandlerRules) isZero() bool {
 	return len(r.Match.PackageNames) == 0 &&
 		len(r.Match.FilePathContains) == 0 &&
+		len(r.Exclude.PackageNames) == 0 &&
+		len(r.Exclude.FilePathContains) == 0 &&
 		!r.Signature.RequireContextFirstArg &&
 		!r.Signature.RequirePointerRequest &&
 		!r.Signature.RequirePointerResponse &&

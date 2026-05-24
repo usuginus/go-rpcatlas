@@ -30,6 +30,15 @@ handlers:
       # - /delivery/
       # - /api/
 
+  exclude:
+    file_path_contains:
+      # gRPC client wrappers often look like handlers by signature but are
+      # outbound calls, not inbound RPC/API entrypoints.
+      - /client/grpc/
+      - /clients/grpc/
+      - /grpc/client/
+      - /grpc/clients/
+
   signature:
     # Typical gRPC shape:
     # func (s *Service) Method(ctx context.Context, req *Request) (*Response, error)

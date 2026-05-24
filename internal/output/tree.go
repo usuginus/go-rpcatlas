@@ -12,6 +12,7 @@ import (
 type callTreeEntry struct {
 	Layer string
 	Call  model.CallRef
+	Sort  model.CallRef
 }
 
 type callTreeNode struct {
@@ -116,6 +117,7 @@ func collectCallTreeEntries(flow model.APIFlow) []callTreeEntry {
 	})
 	entries = appendLayerCallTreeEntries(entries, "async", flow.Trail.Async)
 	entries = appendLayerCallTreeEntries(entries, "other", visibleUnknownCalls(collectFlowUnknownCalls(flow)))
+	entries = applyFunctionValueSortCalls(entries, flow)
 	return filterCallTreeEntries(entries)
 }
 
@@ -127,9 +129,31 @@ func appendLayerCallTreeEntries(entries []callTreeEntry, layer string, calls []m
 		if call.Symbol == "" {
 			continue
 		}
-		entries = append(entries, callTreeEntry{Layer: layer, Call: call})
+		entries = append(entries, callTreeEntry{Layer: layer, Call: call, Sort: call})
 	}
 	return entries
+}
+
+func applyFunctionValueSortCalls(entries []callTreeEntry, flow model.APIFlow) []callTreeEntry {
+	sortCallsByImplementation := make(map[string]model.CallRef)
+	for _, trace := range summarizeFunctionValues(collectFunctionValueTraces(flow)) {
+		for _, implementation := range trace.Implementations {
+			sortCallsByImplementation[callKey(implementation.Call)] = trace.Function
+		}
+	}
+	if len(sortCallsByImplementation) == 0 {
+		return entries
+	}
+	out := append([]callTreeEntry(nil), entries...)
+	for i := range out {
+		sortCall, ok := sortCallsByImplementation[callKey(out[i].Call)]
+		if !ok {
+			continue
+		}
+		sortCall.Depth = out[i].Call.Depth
+		out[i].Sort = sortCall
+	}
+	return out
 }
 
 func filterCallTreeEntries(entries []callTreeEntry) []callTreeEntry {
@@ -195,9 +219,16 @@ func callTreeEntryLess(left callTreeEntry, right callTreeEntry) bool {
 		return left.Call.Depth < right.Call.Depth
 	}
 	if !sameCall(left.Call, right.Call) {
-		return callLess(left.Call, right.Call)
+		return callLess(callTreeSortCall(left), callTreeSortCall(right))
 	}
 	return left.Layer < right.Layer
+}
+
+func callTreeSortCall(entry callTreeEntry) model.CallRef {
+	if entry.Sort.Symbol == "" {
+		return entry.Call
+	}
+	return entry.Sort
 }
 
 func dedupeCallTreeEntries(entries []callTreeEntry) []callTreeEntry {

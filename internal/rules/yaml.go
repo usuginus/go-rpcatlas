@@ -83,7 +83,7 @@ func setContext(state *parserState, indent int, key string) error {
 		switch state.section {
 		case "handlers":
 			switch key {
-			case "match", "signature":
+			case "match", "exclude", "signature":
 				state.handlerGroup = key
 				state.listKey = ""
 				return nil
@@ -259,16 +259,27 @@ func addListItem(ruleSet *RuleSet, state *parserState, indent int, value string)
 }
 
 func addHandlerListValue(handlers *HandlerRules, group string, key string, value string) error {
-	if group != "match" {
-		return fmt.Errorf("handler list %q must be under match", key)
-	}
-	switch key {
-	case "package_names":
-		handlers.Match.PackageNames = append(handlers.Match.PackageNames, value)
-	case "file_path_contains":
-		handlers.Match.FilePathContains = append(handlers.Match.FilePathContains, value)
+	switch group {
+	case "match":
+		switch key {
+		case "package_names":
+			handlers.Match.PackageNames = append(handlers.Match.PackageNames, value)
+		case "file_path_contains":
+			handlers.Match.FilePathContains = append(handlers.Match.FilePathContains, value)
+		default:
+			return fmt.Errorf("unknown handler match list %q", key)
+		}
+	case "exclude":
+		switch key {
+		case "package_names":
+			handlers.Exclude.PackageNames = append(handlers.Exclude.PackageNames, value)
+		case "file_path_contains":
+			handlers.Exclude.FilePathContains = append(handlers.Exclude.FilePathContains, value)
+		default:
+			return fmt.Errorf("unknown handler exclude list %q", key)
+		}
 	default:
-		return fmt.Errorf("unknown handler match list %q", key)
+		return fmt.Errorf("handler list %q must be under match or exclude", key)
 	}
 	return nil
 }

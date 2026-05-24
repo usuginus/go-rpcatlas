@@ -20,6 +20,9 @@ func TestLoadUsesGenericPresetWithoutConfig(t *testing.T) {
 	if len(ruleSet.Ignore.Calls.PackageNames) == 0 {
 		t.Fatal("generic preset has no ignored packages")
 	}
+	if !contains(ruleSet.Handlers.Exclude.FilePathContains, "/client/grpc/") {
+		t.Fatalf("generic preset handler excludes = %#v, want /client/grpc/", ruleSet.Handlers.Exclude.FilePathContains)
+	}
 	if !ruleSet.Ignore.StandardLibrary {
 		t.Fatal("generic preset does not auto-ignore standard library packages")
 	}
@@ -93,6 +96,9 @@ handlers:
       - transport
     file_path_contains:
       - /transport/
+  exclude:
+    file_path_contains:
+      - /client/
   signature:
     require_context_first_arg: true
     require_pointer_request: true
@@ -134,6 +140,9 @@ resolution:
 	}
 	if got := ruleSet.Handlers.Match.PackageNames[0]; got != "transport" {
 		t.Fatalf("package name = %q", got)
+	}
+	if got := ruleSet.Handlers.Exclude.FilePathContains[0]; got != "/client/" {
+		t.Fatalf("handler exclude path = %q", got)
 	}
 	if !ruleSet.Handlers.Signature.RequireErrorReturn {
 		t.Fatal("require_error_return = false, want true")

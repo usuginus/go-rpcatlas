@@ -101,6 +101,59 @@ func TestWriteMarkdownSummarizesRepositoryOperations(t *testing.T) {
 	}
 }
 
+func TestWriteMarkdownShowsFunctionValuesAsCallResolution(t *testing.T) {
+	var buf bytes.Buffer
+	err := WriteMarkdown(&buf, []model.APIFlow{
+		{
+			Name: "CreateFoo",
+			Kind: "grpc",
+			Entrypoint: model.Entrypoint{
+				Symbol: "Server.CreateFoo",
+				File:   "handler.go",
+				Line:   10,
+			},
+			Request:  model.TypeRef{Type: "*pb.CreateFooRequest"},
+			Response: model.TypeRef{Type: "*pb.Foo"},
+			Trail: model.Trail{
+				Layers: []model.LayerCalls{
+					{
+						Name: "usecase",
+						Calls: []model.CallRef{
+							{Symbol: "sampleUsecase.Run", Receiver: "sampleUsecase", Method: "Run", File: "usecase.go", Line: 20, Depth: 2, Via: "Server.CreateFoo"},
+						},
+					},
+				},
+				FunctionValues: []model.FunctionValueTrace{
+					{
+						Wrapper:  model.CallRef{Symbol: "InvokeWithToken", Method: "InvokeWithToken", File: "handler.go", Line: 12, Depth: 1, Via: "Server.CreateFoo"},
+						Function: model.CallRef{Symbol: "s.processor.Run", Receiver: "s.processor", Method: "Run", File: "handler.go", Line: 12, Depth: 1, Via: "InvokeWithToken"},
+						Implementations: []model.ImplementationCandidate{
+							{Call: model.CallRef{Symbol: "sampleUsecase.Run", Receiver: "sampleUsecase", Method: "Run", File: "usecase.go", Line: 20, Depth: 2, Via: "s.processor.Run"}, Expanded: true},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("WriteMarkdown returned error: %v", err)
+	}
+
+	got := buf.String()
+	for _, want := range []string{
+		"- [handler] `Server.CreateFoo` (handler.go:10)\n  - [usecase] `sampleUsecase.Run` (usecase.go:20)",
+		"### call resolution\n\n#### function values\n\n| wrapper | function value | resolved function | resolution |",
+		"| `InvokeWithToken` (handler.go:12) | `s.processor.Run` (handler.go:12) | `sampleUsecase.Run` (usecase.go:20) expanded | single expanded |",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("markdown output does not contain %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "- [usecase] `s.processor.Run`") {
+		t.Fatalf("markdown call tree includes function value callsite as a tree node:\n%s", got)
+	}
+}
+
 func TestWriteMarkdownDisambiguatesSameSymbolHelpersByFile(t *testing.T) {
 	var buf bytes.Buffer
 	err := WriteMarkdown(&buf, []model.APIFlow{
@@ -268,7 +321,7 @@ func TestWriteMarkdownIncludesBranchSummary(t *testing.T) {
 
 	got := buf.String()
 	for _, want := range []string{
-		"### decision points\n\n#### branches\n\n| function | condition | case | calls |",
+		"### control flow\n\n#### conditional paths\n\n| function | condition | path | calls |",
 		"| `documentApplication.ProcessDocument` (application.go:24) | switch `cmd.Mode` | case `\"publish\"` | persistence: `documentStore.Publish`<br>external_client: `previewClient.Index` |",
 		"| `documentApplication.ProcessDocument` (application.go:24) | switch `cmd.Mode` | default | domain: `documentPolicy.RejectUnsupportedMode` |",
 	} {
@@ -404,7 +457,7 @@ func TestWriteMarkdownIncludesDispatchSummary(t *testing.T) {
 
 	got := buf.String()
 	for _, want := range []string{
-		"### decision points\n\n#### dispatches\n\n| dispatch | case | calls |",
+		"### control flow\n\n#### keyed dispatches\n\n| lookup | case | calls |",
 		"| `processor.Process` (application.go:44)<br>from `a.processors[cmd.Kind]`<br>interface: `DocumentProcessor` | case `KindMarkdown` | application: `markdownProcessor.Process`<br>persistence: `documentStore.SaveMarkdown` |",
 		"| `processor.Process` (application.go:44)<br>from `a.processors[cmd.Kind]`<br>interface: `DocumentProcessor` | case `KindImage` | application: `imageProcessor.Process`<br>external_client: `previewClient.RenderImage` |",
 	} {
@@ -414,7 +467,7 @@ func TestWriteMarkdownIncludesDispatchSummary(t *testing.T) {
 	}
 }
 
-func TestWriteMarkdownOrdersDecisionPointSectionsAndOmitsErrorCodes(t *testing.T) {
+func TestWriteMarkdownOrdersAnalysisSectionsAndOmitsErrorCodes(t *testing.T) {
 	var buf bytes.Buffer
 	err := WriteMarkdown(&buf, []model.APIFlow{
 		{
@@ -442,14 +495,16 @@ func TestWriteMarkdownOrdersDecisionPointSectionsAndOmitsErrorCodes(t *testing.T
 	}
 
 	got := buf.String()
+	callResolutionIndex := strings.Index(got, "### call resolution")
 	interfaceIndex := strings.Index(got, "#### interface calls")
-	branchesIndex := strings.Index(got, "#### branches")
-	dispatchesIndex := strings.Index(got, "#### dispatches")
-	if interfaceIndex < 0 || branchesIndex < 0 || dispatchesIndex < 0 {
-		t.Fatalf("markdown output is missing decision point sections:\n%s", got)
+	controlFlowIndex := strings.Index(got, "### control flow")
+	conditionalPathsIndex := strings.Index(got, "#### conditional paths")
+	keyedDispatchesIndex := strings.Index(got, "#### keyed dispatches")
+	if callResolutionIndex < 0 || interfaceIndex < 0 || controlFlowIndex < 0 || conditionalPathsIndex < 0 || keyedDispatchesIndex < 0 {
+		t.Fatalf("markdown output is missing analysis sections:\n%s", got)
 	}
-	if !(interfaceIndex < branchesIndex && branchesIndex < dispatchesIndex) {
-		t.Fatalf("markdown decision point sections are not in stable order:\n%s", got)
+	if !(callResolutionIndex < interfaceIndex && interfaceIndex < controlFlowIndex && controlFlowIndex < conditionalPathsIndex && conditionalPathsIndex < keyedDispatchesIndex) {
+		t.Fatalf("markdown analysis sections are not in stable order:\n%s", got)
 	}
 	if strings.Contains(got, "Error Codes") || strings.Contains(got, "InvalidArgument") {
 		t.Fatalf("markdown output includes project-specific error summary:\n%s", got)
@@ -542,7 +597,7 @@ func TestWriteMarkdownIncludesEntrypointTypeSwitchAsBranch(t *testing.T) {
 
 	got := buf.String()
 	for _, want := range []string{
-		"### decision points\n\n#### branches\n\n| function | condition | case | calls |",
+		"### control flow\n\n#### conditional paths\n\n| function | condition | path | calls |",
 		"| `Service.GetReport` (handler.go:12) | type switch `payload := req.Payload.(type)` | case `*GetReportRequest_V1` | usecase: `report.Get` |",
 		"| `Service.GetReport` (handler.go:12) | type switch `payload := req.Payload.(type)` | default | other: `errors.NewInvalidArgumentErr` |",
 	} {
@@ -590,7 +645,7 @@ func TestWriteMarkdownIncludesInterfaceCallSummary(t *testing.T) {
 
 	got := buf.String()
 	for _, want := range []string{
-		"### decision points\n\n#### interface calls\n\n| call | interface | candidates | resolution |",
+		"### call resolution\n\n#### interface calls\n\n| call | interface | candidates | resolution |",
 		"| `s.fooUsecase.GetFoo` (handler.go:12) | `FooUsecase` | `fooUsecase.GetFoo` (usecase.go:20) expanded<br>`otherFooUsecase.GetFoo` (other_usecase.go:18) candidate | partial |",
 	} {
 		if !strings.Contains(got, want) {
