@@ -7,16 +7,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/usuginus/calltrail-go/internal/rules"
+	"github.com/usuginus/go-rpcatlas/internal/rules"
 )
 
 func writeNoResults(stderr io.Writer, opts Options, ruleSet rules.RuleSet) {
 	fileCount := countGoFiles(opts.Paths)
 	switch {
 	case opts.RPC != "":
-		fmt.Fprintf(stderr, "calltrail-go: no handlers matched --rpc %q\n", opts.RPC)
+		fmt.Fprintf(stderr, "rpcatlas: no handlers matched --rpc %q\n", opts.RPC)
 	default:
-		fmt.Fprintln(stderr, "calltrail-go: no handlers found")
+		fmt.Fprintln(stderr, "rpcatlas: no handlers found")
 	}
 	fmt.Fprintf(stderr, "  paths: %s\n", strings.Join(opts.Paths, ", "))
 	fmt.Fprintf(stderr, "  scanned_go_files: %d\n", fileCount)
@@ -28,8 +28,8 @@ func writeNoResults(stderr io.Writer, opts Options, ruleSet rules.RuleSet) {
 	fmt.Fprintf(stderr, "  handler package_names: %s\n", listOrNone(ruleSet.Handlers.Match.PackageNames))
 	fmt.Fprintf(stderr, "  handler file_path_contains: %s\n", listOrNone(ruleSet.Handlers.Match.FilePathContains))
 	fmt.Fprintln(stderr, "Try:")
-	fmt.Fprintf(stderr, "  calltrail-go %s --list\n", strings.Join(opts.Paths, " "))
-	fmt.Fprintln(stderr, "  calltrail-go <path> --config .calltrail.yaml")
+	fmt.Fprintf(stderr, "  rpcatlas %s --list\n", strings.Join(opts.Paths, " "))
+	fmt.Fprintln(stderr, "  rpcatlas <path> --config .rpcatlas.yaml")
 }
 
 func listOrNone(values []string) string {

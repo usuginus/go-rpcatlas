@@ -5,11 +5,11 @@ import (
 	"go/token"
 	"strings"
 
-	"github.com/usuginus/calltrail-go/internal/model"
-	"github.com/usuginus/calltrail-go/internal/rules"
+	"github.com/usuginus/go-rpcatlas/internal/model"
+	"github.com/usuginus/go-rpcatlas/internal/rules"
 )
 
-// Options controls how much of each handler's call trail is followed.
+// Options controls how much of each handler's downstream flow is followed.
 type Options struct {
 	RPC   string
 	Depth int
@@ -36,7 +36,7 @@ func Analyze(paths []string, opts Options) ([]model.APIFlow, error) {
 }
 
 // DetectHandlers parses the provided Go paths and returns one flow header per
-// detected API handler without building downstream call trails.
+// detected API handler without building downstream flow details.
 func DetectHandlers(paths []string, opts Options) ([]model.APIFlow, error) {
 	opts, fset, sources, err := loadAnalysisInputs(paths, opts)
 	if err != nil {

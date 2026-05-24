@@ -30,7 +30,7 @@ func TestLoadUsesGenericPresetWithoutConfig(t *testing.T) {
 
 func TestLoadConfigReplacesGenericPreset(t *testing.T) {
 	dir := t.TempDir()
-	configPath := filepath.Join(dir, ".calltrail.yaml")
+	configPath := filepath.Join(dir, ".rpcatlas.yaml")
 	err := os.WriteFile(configPath, []byte(`
 version: 1
 handlers:
@@ -72,7 +72,7 @@ ignore:
 }
 
 func TestLoadExampleConfig(t *testing.T) {
-	ruleSet, err := Load(filepath.Join("..", "..", "calltrail.example.yaml"))
+	ruleSet, err := Load(filepath.Join("..", "..", "rpcatlas.example.yaml"))
 	if err != nil {
 		t.Fatalf("Load returned error: %v", err)
 	}

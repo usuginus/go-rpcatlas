@@ -1,7 +1,7 @@
 package analyzer
 
 import (
-	"github.com/usuginus/calltrail-go/internal/model"
+	"github.com/usuginus/go-rpcatlas/internal/model"
 )
 
 func hasCall(calls []model.CallRef, symbol string) bool {

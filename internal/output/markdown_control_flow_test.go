@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/usuginus/calltrail-go/internal/model"
+	"github.com/usuginus/go-rpcatlas/internal/model"
 )
 
 func TestWriteMarkdownIncludesBranchSummary(t *testing.T) {

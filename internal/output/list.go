@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/usuginus/calltrail-go/internal/model"
+	"github.com/usuginus/go-rpcatlas/internal/model"
 )
 
 func WriteList(w io.Writer, flows []model.APIFlow) error {

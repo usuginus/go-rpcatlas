@@ -1,0 +1,97 @@
+name: go-rpcatlas
+description: Generate static RPC flow summaries for Go RPC/API handlers.
+
+inputs:
+  path:
+    description: Go package pattern or directory to analyze.
+    required: false
+    default: ./...
+  rpc:
+    description: RPC or handler name to analyze. Leave empty when list is true.
+    required: false
+    default: ""
+  list:
+    description: Set to true to list detected handlers instead of analyzing one RPC.
+    required: false
+    default: "false"
+  depth:
+    description: Maximum call depth.
+    required: false
+    default: "3"
+  format:
+    description: Output format. Supported values are markdown and json.
+    required: false
+    default: markdown
+  config:
+    description: Optional path to .rpcatlas.yaml.
+    required: false
+    default: ""
+  output-file:
+    description: Optional file path to write the generated output.
+    required: false
+    default: ""
+  working-directory:
+    description: Directory where rpcatlas should run.
+    required: false
+    default: .
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: ${{ github.action_path }}/go.mod
+
+    - name: Install rpcatlas
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        install_dir="$RUNNER_TEMP/rpcatlas/bin"
+        mkdir -p "$install_dir"
+
+        cd "$GITHUB_ACTION_PATH"
+        GOBIN="$install_dir" go install ./cmd/rpcatlas
+
+        echo "$install_dir" >> "$GITHUB_PATH"
+
+    - name: Run rpcatlas
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        RPCATLAS_PATH: ${{ inputs.path }}
+        RPCATLAS_RPC: ${{ inputs.rpc }}
+        RPCATLAS_LIST: ${{ inputs.list }}
+        RPCATLAS_DEPTH: ${{ inputs.depth }}
+        RPCATLAS_FORMAT: ${{ inputs.format }}
+        RPCATLAS_CONFIG: ${{ inputs.config }}
+        RPCATLAS_OUTPUT_FILE: ${{ inputs.output-file }}
+      run: |
+        set -euo pipefail
+
+        args=()
+
+        if [[ "$RPCATLAS_LIST" == "true" ]]; then
+          args+=(--list)
+        fi
+
+        if [[ -n "$RPCATLAS_RPC" ]]; then
+          args+=(--rpc "$RPCATLAS_RPC")
+        fi
+
+        args+=(--depth "$RPCATLAS_DEPTH")
+        args+=(--format "$RPCATLAS_FORMAT")
+
+        if [[ -n "$RPCATLAS_CONFIG" ]]; then
+          args+=(--config "$RPCATLAS_CONFIG")
+        fi
+
+        args+=("$RPCATLAS_PATH")
+
+        if [[ -n "$RPCATLAS_OUTPUT_FILE" ]]; then
+          mkdir -p "$(dirname "$RPCATLAS_OUTPUT_FILE")"
+          rpcatlas "${args[@]}" | tee "$RPCATLAS_OUTPUT_FILE"
+        else
+          rpcatlas "${args[@]}"
+        fi

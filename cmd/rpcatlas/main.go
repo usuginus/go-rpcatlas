@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/usuginus/calltrail-go/internal/cli"
+	"github.com/usuginus/go-rpcatlas/internal/cli"
 )
 
 func main() {

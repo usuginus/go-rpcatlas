@@ -11,10 +11,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/usuginus/calltrail-go/internal/analyzer"
-	"github.com/usuginus/calltrail-go/internal/model"
-	"github.com/usuginus/calltrail-go/internal/output"
-	"github.com/usuginus/calltrail-go/internal/rules"
+	"github.com/usuginus/go-rpcatlas/internal/analyzer"
+	"github.com/usuginus/go-rpcatlas/internal/model"
+	"github.com/usuginus/go-rpcatlas/internal/output"
+	"github.com/usuginus/go-rpcatlas/internal/rules"
 )
 
 const (
@@ -37,14 +37,14 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) error {
 	opts, err := Parse(args, stderr)
 	if err != nil {
 		if err != ErrHelp {
-			fmt.Fprintf(stderr, "calltrail-go: %v\n", err)
+			fmt.Fprintf(stderr, "rpcatlas: %v\n", err)
 		}
 		return err
 	}
 
 	ruleSet, err := rules.Load(opts.Config)
 	if err != nil {
-		fmt.Fprintf(stderr, "calltrail-go: %v\n", err)
+		fmt.Fprintf(stderr, "rpcatlas: %v\n", err)
 		return err
 	}
 	if opts.List {
@@ -56,14 +56,14 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) error {
 func runAnalyze(stdout io.Writer, stderr io.Writer, opts Options, ruleSet rules.RuleSet) error {
 	flows, err := analyzer.Analyze(opts.Paths, analyzerOptions(opts, ruleSet))
 	if err != nil {
-		fmt.Fprintf(stderr, "calltrail-go: %v\n", err)
+		fmt.Fprintf(stderr, "rpcatlas: %v\n", err)
 		return err
 	}
 	if len(flows) == 0 {
 		writeNoResults(stderr, opts, ruleSet)
 	}
 	if err := rejectAmbiguousRPC(opts, flows); err != nil {
-		fmt.Fprintf(stderr, "calltrail-go: %v\n", err)
+		fmt.Fprintf(stderr, "rpcatlas: %v\n", err)
 		return err
 	}
 	return writeAnalysisOutput(stdout, stderr, opts, flows)
@@ -72,7 +72,7 @@ func runAnalyze(stdout io.Writer, stderr io.Writer, opts Options, ruleSet rules.
 func runList(stdout io.Writer, stderr io.Writer, opts Options, ruleSet rules.RuleSet) error {
 	flows, err := analyzer.DetectHandlers(opts.Paths, analyzerOptions(opts, ruleSet))
 	if err != nil {
-		fmt.Fprintf(stderr, "calltrail-go: %v\n", err)
+		fmt.Fprintf(stderr, "rpcatlas: %v\n", err)
 		return err
 	}
 	if len(flows) == 0 {
@@ -114,17 +114,17 @@ func writeListOutput(stdout io.Writer, stderr io.Writer, opts Options, flows []m
 		enc := json.NewEncoder(stdout)
 		enc.SetIndent("", "  ")
 		if err := enc.Encode(flows); err != nil {
-			fmt.Fprintf(stderr, "calltrail-go: encode json: %v\n", err)
+			fmt.Fprintf(stderr, "rpcatlas: encode json: %v\n", err)
 			return err
 		}
 	case "markdown", "md":
 		if err := output.WriteList(stdout, flows); err != nil {
-			fmt.Fprintf(stderr, "calltrail-go: write list: %v\n", err)
+			fmt.Fprintf(stderr, "rpcatlas: write list: %v\n", err)
 			return err
 		}
 	default:
 		err := fmt.Errorf("unsupported format %q; use json or markdown", opts.Format)
-		fmt.Fprintf(stderr, "calltrail-go: %v\n", err)
+		fmt.Fprintf(stderr, "rpcatlas: %v\n", err)
 		return err
 	}
 	return nil
@@ -136,17 +136,17 @@ func writeAnalysisOutput(stdout io.Writer, stderr io.Writer, opts Options, flows
 		enc := json.NewEncoder(stdout)
 		enc.SetIndent("", "  ")
 		if err := enc.Encode(flows); err != nil {
-			fmt.Fprintf(stderr, "calltrail-go: encode json: %v\n", err)
+			fmt.Fprintf(stderr, "rpcatlas: encode json: %v\n", err)
 			return err
 		}
 	case "markdown", "md":
 		if err := output.WriteMarkdown(stdout, flows); err != nil {
-			fmt.Fprintf(stderr, "calltrail-go: write markdown: %v\n", err)
+			fmt.Fprintf(stderr, "rpcatlas: write markdown: %v\n", err)
 			return err
 		}
 	default:
 		err := fmt.Errorf("unsupported format %q; use json or markdown", opts.Format)
-		fmt.Fprintf(stderr, "calltrail-go: %v\n", err)
+		fmt.Fprintf(stderr, "rpcatlas: %v\n", err)
 		return err
 	}
 	return nil
@@ -154,12 +154,12 @@ func writeAnalysisOutput(stdout io.Writer, stderr io.Writer, opts Options, flows
 
 func Parse(args []string, stderr io.Writer) (Options, error) {
 	var opts Options
-	fs := flag.NewFlagSet("calltrail-go", flag.ContinueOnError)
+	fs := flag.NewFlagSet("rpcatlas", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.StringVar(&opts.Format, "format", defaultFormat, "output format: markdown or json")
 	fs.StringVar(&opts.RPC, "rpc", "", "filter by RPC/API handler name or receiver-qualified symbol")
 	fs.IntVar(&opts.Depth, "depth", defaultDepth, "call extraction depth")
-	fs.StringVar(&opts.Config, "config", "", "path to .calltrail.yaml")
+	fs.StringVar(&opts.Config, "config", "", "path to .rpcatlas.yaml")
 	fs.BoolVar(&opts.List, "list", false, "list detected handlers and exit")
 	fs.Usage = func() {
 		fmt.Fprint(stderr, usageText())
@@ -188,16 +188,16 @@ func Parse(args []string, stderr io.Writer) (Options, error) {
 
 func usageText() string {
 	return `Usage:
-  calltrail-go [flags] [path ...]
+  rpcatlas [flags] [path ...]
 
 Examples:
-  calltrail-go ./...
-  calltrail-go ./... --rpc GetFoo
-  calltrail-go ./... --rpc Server.GetFoo
-  calltrail-go ./... --rpc GetFoo --depth 5
-  calltrail-go ./... --list
-  calltrail-go ./... --format json
-  calltrail-go ./... --config .calltrail.yaml
+  rpcatlas ./...
+  rpcatlas ./... --rpc GetFoo
+  rpcatlas ./... --rpc Server.GetFoo
+  rpcatlas ./... --rpc GetFoo --depth 5
+  rpcatlas ./... --list
+  rpcatlas ./... --format json
+  rpcatlas ./... --config .rpcatlas.yaml
 
 Flags:
 `
@@ -217,7 +217,7 @@ func FindConfig(paths []string) string {
 			continue
 		}
 		for {
-			candidate := filepath.Join(abs, ".calltrail.yaml")
+			candidate := filepath.Join(abs, ".rpcatlas.yaml")
 			if _, err := stat(candidate); err == nil {
 				return candidate
 			}

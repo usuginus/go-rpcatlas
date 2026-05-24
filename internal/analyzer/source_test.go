@@ -10,7 +10,7 @@ func TestIsStdlibImportPath(t *testing.T) {
 	}{
 		{name: "stdlib root", importPath: "context", want: true},
 		{name: "stdlib nested", importPath: "net/http", want: true},
-		{name: "domain package", importPath: "github.com/usuginus/calltrail-go", want: false},
+		{name: "domain package", importPath: "github.com/usuginus/go-rpcatlas", want: false},
 		{name: "domain package with go prefix", importPath: "go.temporal.io/server/common", want: false},
 	}
 
