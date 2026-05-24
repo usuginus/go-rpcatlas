@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/usuginus/calltrail-go/internal/model"
+	"github.com/usuginus/go-rpcatlas/internal/model"
 )
 
 func TestParseDefaultsForHumanReadableOutput(t *testing.T) {
@@ -144,7 +144,7 @@ func TestRunRejectsAmbiguousShortRPCFilter(t *testing.T) {
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
-	want := `calltrail-go: ambiguous --rpc "GetFoo" matched 2 handlers; use one of: debugService.GetFoo, userService.GetFoo`
+	want := `rpcatlas: ambiguous --rpc "GetFoo" matched 2 handlers; use one of: debugService.GetFoo, userService.GetFoo`
 	if !strings.Contains(stderr.String(), want) {
 		t.Fatalf("stderr does not contain %q:\n%s", want, stderr.String())
 	}
@@ -178,7 +178,7 @@ func TestRunJSONOutputsBranchDetails(t *testing.T) {
 	var stderr bytes.Buffer
 	err := Run([]string{
 		"../../examples/branch-dispatch",
-		"--config", "../../examples/branch-dispatch/.calltrail.yaml",
+		"--config", "../../examples/branch-dispatch/.rpcatlas.yaml",
 		"--rpc", "ProcessFoo",
 		"--depth", "3",
 		"--format", "json",
@@ -214,7 +214,7 @@ func TestRunJSONOutputsDispatchDetails(t *testing.T) {
 	var stderr bytes.Buffer
 	err := Run([]string{
 		"../../examples/map-dispatch",
-		"--config", "../../examples/map-dispatch/.calltrail.yaml",
+		"--config", "../../examples/map-dispatch/.rpcatlas.yaml",
 		"--rpc", "ProcessFoo",
 		"--depth", "4",
 		"--format", "json",
@@ -265,7 +265,7 @@ func TestFindConfigSearchesParentDirectories(t *testing.T) {
 	if err := os.MkdirAll(child, 0o755); err != nil {
 		t.Fatalf("MkdirAll returned error: %v", err)
 	}
-	configPath := filepath.Join(root, ".calltrail.yaml")
+	configPath := filepath.Join(root, ".rpcatlas.yaml")
 	if err := os.WriteFile(configPath, []byte("version: 1\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
@@ -294,11 +294,11 @@ func TestRunNoHandlersWritesDiagnostics(t *testing.T) {
 	}
 	got := stderr.String()
 	for _, want := range []string{
-		"calltrail-go: no handlers found",
+		"rpcatlas: no handlers found",
 		"scanned_go_files: 1",
 		"handler package_names: grpc",
 		"rules: built-in generic",
-		"calltrail-go " + dir + " --list",
+		"rpcatlas " + dir + " --list",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("stderr does not contain %q:\n%s", want, got)

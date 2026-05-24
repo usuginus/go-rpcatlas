@@ -6,8 +6,8 @@ import (
 	"go/token"
 	"strings"
 
-	"github.com/usuginus/calltrail-go/internal/model"
-	"github.com/usuginus/calltrail-go/internal/rules"
+	"github.com/usuginus/go-rpcatlas/internal/model"
+	"github.com/usuginus/go-rpcatlas/internal/rules"
 )
 
 type dispatchTableInfo struct {

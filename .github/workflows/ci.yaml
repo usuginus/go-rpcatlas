@@ -51,7 +51,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const marker = '<!-- calltrail-go-coverage -->';
+            const marker = '<!-- go-rpcatlas-coverage -->';
             const body = `${marker}\n${fs.readFileSync('coverage.md', 'utf8')}`;
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;

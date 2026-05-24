@@ -1,6 +1,6 @@
-# calltrail-go configuration.
+# go-rpcatlas configuration.
 #
-# If this file is copied to .calltrail.yaml, it replaces the built-in generic
+# If this file is copied to .rpcatlas.yaml, it replaces the built-in generic
 # rules. Keep the active rules small, then uncomment aliases that match your
 # project's architecture vocabulary.
 version: 1

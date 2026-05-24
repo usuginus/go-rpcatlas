@@ -3,7 +3,7 @@ package analyzer
 import (
 	"testing"
 
-	"github.com/usuginus/calltrail-go/internal/rules"
+	"github.com/usuginus/go-rpcatlas/internal/rules"
 )
 
 func TestAnalyzeDetectsGRPCHandlerTrail(t *testing.T) {

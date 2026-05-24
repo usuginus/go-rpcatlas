@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/usuginus/calltrail-go/internal/model"
+	"github.com/usuginus/go-rpcatlas/internal/model"
 )
 
 type callTreeEntry struct {

@@ -1,249 +1,202 @@
-# calltrail-go
+# go-rpcatlas
 
-`calltrail-go` maps Go RPC/API handlers to the downstream calls they make.
+[![CI](https://github.com/usuginus/go-rpcatlas/actions/workflows/ci.yaml/badge.svg)](https://github.com/usuginus/go-rpcatlas/actions/workflows/ci.yaml)
 
-It is built for code review, onboarding, documentation, and LLM-assisted
-analysis. The goal is not a perfect whole-program call graph. The goal is a
-clear per-RPC summary of "what this endpoint touches".
+`go-rpcatlas` generates a compact static RPC map for Go RPC/API handlers.
 
-## Status
+It is built for code review, onboarding, and AI-assisted code reading: point it at a
+handler, then get a deterministic Markdown or JSON summary of the relevant calls,
+layers, branches, dispatches, and interface/function-value edges.
 
-Experimental. The current version focuses on gRPC-style handlers and lightweight
-AST heuristics.
+## Features
+
+- Find gRPC-style handlers and list available RPCs.
+- Render a readable Markdown call tree for one handler.
+- Group detected functions by configurable layers such as `repository`,
+  `external_client`, or any project-specific name.
+- Surface decision points: interface calls, function-value calls, branches, and
+  keyed dispatches.
+- Use AST-based static analysis only. It does not run the target service.
+- Configure noise filtering and layer rules with `.rpcatlas.yaml`.
 
 ## Install
 
-```sh
-go install github.com/usuginus/calltrail-go/cmd/calltrail-go@latest
+### Go install
+
+```bash
+go install github.com/usuginus/go-rpcatlas/cmd/rpcatlas@latest
 ```
 
-For local development:
+### Install script
 
-```sh
-go build -o /tmp/calltrail-go ./cmd/calltrail-go
+```bash
+curl -fsSL https://raw.githubusercontent.com/usuginus/go-rpcatlas/main/install.sh | sh
+```
+
+Pin a release or install to a custom directory:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/usuginus/go-rpcatlas/main/install.sh \
+  | VERSION=v0.1.0 INSTALL_DIR=/usr/local/bin sh
 ```
 
 ## Quick Start
 
-Run it from a Go repository:
+List handlers:
 
-```sh
-calltrail-go ./...
+```bash
+rpcatlas ./... --list
 ```
 
-List detected handlers first:
+Generate a Markdown summary:
 
-```sh
-calltrail-go ./... --list
+```bash
+rpcatlas ./... --rpc GetFoo --depth 5 --format markdown
 ```
 
-```md
-| rpc | handler | location |
-| --- | --- | --- |
-| `Translate` | `TranslationController.Translate` | `internal/controller/grpc/v1/translation.go:32` |
+Generate JSON for automation:
+
+```bash
+rpcatlas ./... --rpc GetFoo --depth 5 --format json
 ```
 
-Analyze one RPC:
+Use a config file:
 
-```sh
-calltrail-go ./... --rpc Translate
+```bash
+rpcatlas ./... --config .rpcatlas.yaml --rpc GetFoo --depth 5
 ```
 
-Follow deeper calls:
+## GitHub Action
 
-```sh
-calltrail-go ./... --rpc Translate --depth 5
+This repository also ships a composite action. It installs the CLI from the same
+ref as the action and runs it in your workflow.
+
+```yaml
+name: rpcatlas
+
+on:
+  pull_request:
+
+jobs:
+  rpcatlas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: usuginus/go-rpcatlas@main
+        with:
+          path: ./...
+          rpc: GetFoo
+          depth: "5"
+          format: markdown
+          output-file: rpcatlas.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpcatlas
+          path: rpcatlas.md
 ```
 
-The default output is Markdown summary format. Use JSON when you want raw data
-for another tool:
+For repeatable CI, pin the action to a release tag once releases are available.
 
-```sh
-calltrail-go ./... --rpc Translate --format json
-calltrail-go ./... --list --format json
+## Configuration
+
+`go-rpcatlas` works without configuration, but `.rpcatlas.yaml` makes the output
+much more useful for real projects.
+
+```yaml
+# Optional package presets.
+presets:
+  - generic
+
+# Calls that should be hidden from the call tree.
+ignore_calls:
+  packages:
+    - fmt
+    - log
+  names:
+    - Error
+
+# Output sections. The name is emitted as-is.
+layers:
+  - name: repository
+    match:
+      call_name_contains:
+        - repository
+      receiver_type_contains:
+        - repository
+      file_path_contains:
+        - /repository/
+
+  - name: external_client
+    match:
+      call_name_contains:
+        - client
+      receiver_type_contains:
+        - client
+      file_path_contains:
+        - /client/
+        - /gateway/
 ```
 
-## Examples
-
-This repository includes small Go examples that double as regression fixtures.
-
-Run the generic gRPC-style example with the built-in rules:
-
-```sh
-go run ./cmd/calltrail-go ./examples/grpc-basic --rpc GetFoo --depth 3
-```
-
-Run the custom-layer example with its project config:
-
-```sh
-go run ./cmd/calltrail-go ./examples/custom-layers \
-  --config ./examples/custom-layers/.calltrail.yaml \
-  --rpc ProcessFoo \
-  --depth 3
-```
-
-Run the branch-dispatch example to see switch and type-switch details:
-
-```sh
-go run ./cmd/calltrail-go ./examples/branch-dispatch \
-  --config ./examples/branch-dispatch/.calltrail.yaml \
-  --rpc ProcessFoo \
-  --depth 3
-```
-
-Run the map-dispatch example to see static dispatch tables such as
-`map[FooKind]FooProcessor`:
-
-```sh
-go run ./cmd/calltrail-go ./examples/map-dispatch \
-  --config ./examples/map-dispatch/.calltrail.yaml \
-  --rpc ProcessFoo \
-  --depth 4
-```
-
-### Public Sample Repository
-
-`calltrail-go` is also tested manually against the public
-[evrone/go-clean-template](https://github.com/evrone/go-clean-template)
-repository because it uses a common Clean Architecture layout:
-
-- `internal/controller/grpc`
-- `internal/usecase`
-- `internal/repo/persistent`
-- `internal/repo/webapi`
-- `internal/entity`
-
-Example:
-
-```sh
-calltrail-go /path/to/go-clean-template --rpc Translate --depth 3
-```
-
-## What It Detects
-
-`calltrail-go` currently detects methods shaped like this:
-
-```go
-func (c *TranslationController) Translate(ctx context.Context, req *v1.TranslateRequest) (*v1.TranslateResponse, error)
-```
-
-For each handler, it extracts:
-
-- handler symbol, file, and line
-- request and response types
-- downstream calls grouped by configured layers, plus async and notable calls
-- interface-typed calls and the implementation candidates inferred for them
-- static map-dispatch calls such as `processor := a.processors[kind]`
-- branch-specific calls for `switch` and `type switch` statements
-- gRPC status codes returned via `status.Error` and `status.Errorf`
-
-With `--depth` greater than 1, `calltrail-go` follows implementation candidates
-when it can infer them from interface assertions such as:
-
-```go
-var _ Translation = (*UseCase)(nil)
-```
-
-It can also resolve common syntax-driven patterns when the relevant code is
-visible to the analyzer:
-
-- nested struct fields such as `u.repositories.Foo.Find`
-- local variables initialized from constructors, such as `uc := NewUsecase()`
-- chained constructor calls, such as `NewUsecase().Run(ctx)`
-- static dispatch tables stored in struct fields, such as
-  `handlers: map[Kind]Handler{KindA: newKindAHandler()}`
-
-## How It Works
-
-`calltrail-go` is intentionally syntax-driven:
-
-1. Walk target paths and parse non-test Go files.
-2. Build a lightweight project index of functions, methods, struct fields,
-   interfaces, and implementation assertions.
-3. Detect handlers using configurable rules.
-4. Follow calls up to `--depth` using local type inference and layer rules.
-5. Render a compact summary for humans, or raw JSON for tools.
-
-It does not run `go list`, compile packages, or load external dependencies.
-This keeps setup simple and makes the tool usable in partially configured
-repositories, at the cost of some precision versus a full type checker.
+See [rpcatlas.example.yaml](rpcatlas.example.yaml) for a fuller starting
+point.
 
 ## Output
 
-Markdown output is deterministic and optimized for review, onboarding, and
-LLM-assisted documentation. It renders a static call tree from syntax-driven
-call relationships, then adds a compact function index with locations and
-occurrence counts. Layer names come directly from the active rules, call
-resolution and control-flow details are rendered as tables, and unexported
-helper calls are omitted so the output stays readable without project-specific
-presentation rules baked into the binary. Interface implementations are static
-candidates, not runtime traces. The analysis tables focus on calls selected
-directly by an interface call, function value, conditional path, or keyed
-dispatch; deeper dependencies stay in the call tree and function index.
+Markdown output is designed to be pasted into a pull request, issue, or AI
+review prompt. It highlights the entry point, the important downstream calls, and
+the places where static resolution matters.
 
 ```markdown
-## Translate
+## GetFoo
 
 ### execution summary
 
 - kind: `grpc`
-- handler: `TranslationController.Translate` (internal/controller/grpc/v1/translation.go:32)
-- request: `*v1.TranslateRequest`
-- response: `*v1.TranslateResponse`
+- handler: `Service.GetFoo` (internal/handler/foo.go:24)
+- request: `*foov1.GetFooRequest`
+- response: `*foov1.GetFooResponse`
 - layers:
-  - usecase: 1 call
-  - external_client: 1 call
+  - application: 1 call
   - repository: 1 call
+  - external_client: 1 call
 - call resolution:
-  - interface calls: 4
-  - function values: 0
+  - interface calls: 1
+  - function values: 1
 - control flow:
-  - conditional paths: 0
-  - keyed dispatches: 0
+  - conditional paths: 1
+  - keyed dispatches: 1
 
 ### call tree
 
-- [handler] `TranslationController.Translate` (internal/controller/grpc/v1/translation.go:32)
-  - [other] `grpcmw.UserIDFromContext` (internal/controller/grpc/v1/translation.go:33)
-  - [usecase] `c.t.Translate` (internal/controller/grpc/v1/translation.go:38)
-    - [usecase] `UseCase.Translate` (internal/usecase/translation/translation.go:36)
-      - [external_client] `uc.webAPI.Translate` (internal/usecase/translation/translation.go:37)
-        - [external_client] `TranslationWebAPI.Translate` (internal/repo/webapi/translation_google.go:29)
-      - [repository] `uc.repo.Store` (internal/usecase/translation/translation.go:42)
-        - [repository] `TranslationRepo.Store` (internal/repo/persistent/translation_postgres.go:57)
-  - [other] `c.l.Error` (internal/controller/grpc/v1/translation.go:44)
-    - [other] `Logger.Error` (pkg/logger/logger.go:75)
+- [handler] `Service.GetFoo` (internal/handler/foo.go:24)
+  - [application] `s.fooService.GetFoo` (internal/handler/foo.go:31)
+    - [repository] `fooRepo.Find` (internal/repository/foo.go:18)
+    - [external_client] `profileClient.Get` (internal/client/profile.go:42)
+  - [application] `workflow.Run` (internal/workflow/foo.go:15)
+    - [function_value] `validateFoo` (internal/workflow/foo.go:28)
 
 ### function index
 
-#### usecase
+#### application
 
 | function | location | occurrences |
 | --- | --- | ---: |
-| `c.t.Translate` | `internal/controller/grpc/v1/translation.go:38` | 1 |
-| `UseCase.Translate` | `internal/usecase/translation/translation.go:36` | 1 |
-
-#### external_client
-
-| function | location | occurrences |
-| --- | --- | ---: |
-| `TranslationWebAPI.Translate` | `internal/repo/webapi/translation_google.go:29` | 1 |
-| `uc.webAPI.Translate` | `internal/usecase/translation/translation.go:37` | 1 |
+| `s.fooService.GetFoo` | `internal/handler/foo.go:31` | 1 |
+| `workflow.Run` | `internal/workflow/foo.go:15` | 1 |
 
 #### repository
 
 | function | location | occurrences |
 | --- | --- | ---: |
-| `TranslationRepo.Store` | `internal/repo/persistent/translation_postgres.go:57` | 1 |
-| `uc.repo.Store` | `internal/usecase/translation/translation.go:42` | 1 |
+| `fooRepo.Find` | `internal/repository/foo.go:18` | 1 |
 
-#### other
+#### external_client
 
 | function | location | occurrences |
 | --- | --- | ---: |
-| `grpcmw.UserIDFromContext` | `internal/controller/grpc/v1/translation.go:33` | 1 |
-| `c.l.Error` | `internal/controller/grpc/v1/translation.go:44` | 1 |
-| `Logger.Error` | `pkg/logger/logger.go:75` | 1 |
+| `profileClient.Get` | `internal/client/profile.go:42` | 1 |
 
 ### call resolution
 
@@ -251,179 +204,57 @@ dispatch; deeper dependencies stay in the call tree and function index.
 
 | call | interface | candidates | resolution |
 | --- | --- | --- | --- |
-| `c.l.Error` (internal/controller/grpc/v1/translation.go:44) | `Interface` | `Logger.Error` (pkg/logger/logger.go:75) expanded | single expanded |
-| `c.t.Translate` (internal/controller/grpc/v1/translation.go:38) | `Translation` | `UseCase.Translate` (internal/usecase/translation/translation.go:36) expanded | single expanded |
-| `uc.repo.Store` (internal/usecase/translation/translation.go:42) | `TranslationRepo` | `TranslationRepo.Store` (internal/repo/persistent/translation_postgres.go:57) expanded | single expanded |
-| `uc.webAPI.Translate` (internal/usecase/translation/translation.go:37) | `TranslationWebAPI` | `TranslationWebAPI.Translate` (internal/repo/webapi/translation_google.go:29) expanded | single expanded |
+| `s.fooService.GetFoo` (internal/handler/foo.go:31) | `FooService` | `fooService.GetFoo` (internal/service/foo.go:12) expanded | single expanded |
+
+#### function values
+
+| wrapper | function value | resolved function | resolution |
+| --- | --- | --- | --- |
+| `workflow.Run` (internal/workflow/foo.go:15) | `validateFoo` | `validateFoo` (internal/workflow/foo.go:28) expanded | direct function argument |
+
+### control flow
+
+#### conditional paths
+
+| function | condition | path | calls |
+| --- | --- | --- |
+| `fooService.GetFoo` | `req.IncludeProfile` | if | `profileClient.Get` |
+
+#### keyed dispatches
+
+| lookup | case | calls |
+| --- | --- | --- |
+| `processors[req.Kind]` | `FooKindStandard` | `standardProcessor.Process` |
 ```
 
-JSON output keeps the raw trail data, including free-form layer names under
-`trail.layers`, interface and function-value details under
-`trail.interface_calls` and `trail.function_values`, and keyed-dispatch and
-conditional-path details under `trail.dispatches` and `trail.branches`.
-Error-code detection is kept in JSON because error handling is often
-project-specific and can be noisy in the Markdown summary:
+JSON output contains the same analysis data in a machine-readable shape.
 
-```sh
-calltrail-go ./... --rpc Translate --format json
+## Public Sample
+
+For a public, non-domain-specific target, try
+[evrone/go-clean-template](https://github.com/evrone/go-clean-template):
+
+```bash
+git clone https://github.com/evrone/go-clean-template.git /tmp/go-clean-template
+rpcatlas /tmp/go-clean-template --list
 ```
 
-## Configuration
+## Limits
 
-By default, `calltrail-go` uses conservative built-in generic rules for handler
-detection, call classification, and utility-call filtering.
+`go-rpcatlas` is intentionally lightweight. It relies on Go AST and type
+information plus project-configurable heuristics; it is not a full SSA or runtime
+tracer.
 
-If `--config` is omitted, `calltrail-go` looks for `.calltrail.yaml` from each
-target path upward. When a config file is found, it replaces the built-in
-generic rules instead of merging with them.
+That means it can produce a concise, deterministic summary quickly, but it may
+miss calls that depend on complex runtime wiring, reflection, generated dynamic
+registries, or build tags that are not active in the current environment.
 
-```sh
-calltrail-go ./... --config .calltrail.yaml
+## Development
+
+```bash
+go test ./...
+go build -o /tmp/rpcatlas ./cmd/rpcatlas
+/tmp/rpcatlas ./examples/grpc-basic --rpc GetFoo --depth 4
 ```
 
-Start from `calltrail.example.yaml` when creating a project config. Because
-project config replaces the built-in rules, keep the active rules small and
-uncomment only the architecture aliases that match your project.
-
-Example:
-
-```yaml
-version: 1
-
-handlers:
-  match:
-    package_names:
-      - grpc
-    file_path_contains:
-      - /grpc/
-  signature:
-    require_context_first_arg: true
-    require_pointer_request: true
-    require_pointer_response: true
-    require_error_return: true
-
-layers:
-  - name: application
-    match:
-      file_path_contains:
-        - /application/
-  - name: repository
-    match:
-      receiver_type_contains:
-        - repository
-
-ignore:
-  standard_library: true
-  calls:
-    full_names:
-      - context.Background
-```
-
-The built-in generic rules auto-ignore calls made through standard-library
-package imports. For example, `encoding/json` is ignored through the actual
-local import name such as `json.Marshal`, and aliased imports are handled as
-well.
-
-## Flags
-
-```text
---rpc string       filter by RPC/API handler name or receiver-qualified symbol
---list             list detected handlers and exit
---depth int        call extraction depth (default 3)
---format string    output format: markdown or json (default markdown)
---config string    path to .calltrail.yaml
-```
-
-Flags can be placed before or after paths:
-
-```sh
-calltrail-go ./... --rpc Translate
-calltrail-go ./... --rpc TranslationController.Translate
-calltrail-go --rpc Translate ./...
-```
-
-If multiple handlers share the same method name, use the receiver-qualified
-symbol shown by `--list`, such as `TranslationController.Translate`.
-
-## Troubleshooting
-
-### No handlers found
-
-Start with `--list`:
-
-```sh
-calltrail-go ./... --list
-```
-
-If the list is empty, check whether your handlers match the default generic
-rules:
-
-- package name is `grpc`, or file path contains `/grpc/`
-- method has a receiver
-- first argument is `context.Context`
-- second argument is a pointer request
-- first return value is a pointer response
-- second return value is `error`
-
-If your project uses a different layout, copy `calltrail.example.yaml` and
-tune `handlers.match`:
-
-```yaml
-version: 1
-
-handlers:
-  match:
-    file_path_contains:
-      - /handler/
-      - /transport/
-  signature:
-    require_context_first_arg: true
-    require_pointer_request: true
-    require_pointer_response: true
-    require_error_return: true
-```
-
-When no handlers are found, `calltrail-go` prints diagnostics to stderr,
-including scanned Go file count, active rules, and handler rules.
-
-### Calls are classified as Unknown
-
-Add or tune `layers` in `.calltrail.yaml`. A layer's `name` is free-form and is
-used directly in Markdown and JSON output:
-
-```yaml
-version: 1
-
-layers:
-  - name: application
-    match:
-      call_name_contains:
-        - usecase
-      file_path_contains:
-        - /application/
-  - name: repository
-    match:
-      receiver_type_contains:
-        - repository
-```
-
-## Benchmarking
-
-Use Go benchmarks to track analyzer and CLI performance before and after
-optimization work:
-
-```sh
-go test ./internal/analyzer -run '^$' -bench=. -benchmem
-go test ./internal/cli -run '^$' -bench=. -benchmem
-```
-
-The analyzer benchmarks cover full trail extraction, RPC filtering, and handler
-detection without downstream call trails. The CLI benchmarks cover `--list`,
-Markdown output, and JSON output for representative fixtures.
-
-## Roadmap
-
-- Type-aware call resolution with `go/packages`
-- Test candidate detection
-- LLM template output
-- HTTP handler support
+The CI workflow also checks formatting, unit tests, and coverage summary output.

@@ -3,7 +3,7 @@ package analyzer
 import (
 	"testing"
 
-	"github.com/usuginus/calltrail-go/internal/rules"
+	"github.com/usuginus/go-rpcatlas/internal/rules"
 )
 
 func TestAnalyzeGRPCBasicExample(t *testing.T) {
@@ -31,7 +31,7 @@ func TestAnalyzeGRPCBasicExample(t *testing.T) {
 }
 
 func TestAnalyzeCustomLayersExample(t *testing.T) {
-	ruleSet, err := rules.Load("../../examples/custom-layers/.calltrail.yaml")
+	ruleSet, err := rules.Load("../../examples/custom-layers/.rpcatlas.yaml")
 	if err != nil {
 		t.Fatalf("Load returned error: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestAnalyzeCustomLayersExample(t *testing.T) {
 }
 
 func TestAnalyzeBranchDispatchExample(t *testing.T) {
-	ruleSet, err := rules.Load("../../examples/branch-dispatch/.calltrail.yaml")
+	ruleSet, err := rules.Load("../../examples/branch-dispatch/.rpcatlas.yaml")
 	if err != nil {
 		t.Fatalf("Load returned error: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestAnalyzeBranchDispatchExample(t *testing.T) {
 }
 
 func TestAnalyzeMapDispatchExample(t *testing.T) {
-	ruleSet, err := rules.Load("../../examples/map-dispatch/.calltrail.yaml")
+	ruleSet, err := rules.Load("../../examples/map-dispatch/.rpcatlas.yaml")
 	if err != nil {
 		t.Fatalf("Load returned error: %v", err)
 	}

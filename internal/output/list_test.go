@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/usuginus/calltrail-go/internal/model"
+	"github.com/usuginus/go-rpcatlas/internal/model"
 )
 
 func TestWriteList(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 	"go/token"
 	"testing"
 
-	"github.com/usuginus/calltrail-go/internal/model"
-	"github.com/usuginus/calltrail-go/internal/rules"
+	"github.com/usuginus/go-rpcatlas/internal/model"
+	"github.com/usuginus/go-rpcatlas/internal/rules"
 )
 
 var benchmarkFlows []model.APIFlow
@@ -26,7 +26,7 @@ func BenchmarkAnalyzeGRPCBasicDepth3(b *testing.B) {
 }
 
 func BenchmarkAnalyzeBranchDispatchDepth3(b *testing.B) {
-	ruleSet := mustLoadRules(b, "../../examples/branch-dispatch/.calltrail.yaml")
+	ruleSet := mustLoadRules(b, "../../examples/branch-dispatch/.rpcatlas.yaml")
 	opts := Options{Depth: 3, Rules: ruleSet}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -39,7 +39,7 @@ func BenchmarkAnalyzeBranchDispatchDepth3(b *testing.B) {
 }
 
 func BenchmarkAnalyzeMapDispatchDepth4(b *testing.B) {
-	ruleSet := mustLoadRules(b, "../../examples/map-dispatch/.calltrail.yaml")
+	ruleSet := mustLoadRules(b, "../../examples/map-dispatch/.rpcatlas.yaml")
 	opts := Options{Depth: 4, Rules: ruleSet}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -52,7 +52,7 @@ func BenchmarkAnalyzeMapDispatchDepth4(b *testing.B) {
 }
 
 func BenchmarkAnalyzeMapDispatchRPCFilter(b *testing.B) {
-	ruleSet := mustLoadRules(b, "../../examples/map-dispatch/.calltrail.yaml")
+	ruleSet := mustLoadRules(b, "../../examples/map-dispatch/.rpcatlas.yaml")
 	opts := Options{RPC: "ProcessFoo", Depth: 4, Rules: ruleSet}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -65,7 +65,7 @@ func BenchmarkAnalyzeMapDispatchRPCFilter(b *testing.B) {
 }
 
 func BenchmarkAnalyzeMapDispatchRPCNoMatch(b *testing.B) {
-	ruleSet := mustLoadRules(b, "../../examples/map-dispatch/.calltrail.yaml")
+	ruleSet := mustLoadRules(b, "../../examples/map-dispatch/.rpcatlas.yaml")
 	opts := Options{RPC: "MissingRPC", Depth: 4, Rules: ruleSet}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -78,7 +78,7 @@ func BenchmarkAnalyzeMapDispatchRPCNoMatch(b *testing.B) {
 }
 
 func BenchmarkDetectHandlersMapDispatch(b *testing.B) {
-	ruleSet := mustLoadRules(b, "../../examples/map-dispatch/.calltrail.yaml")
+	ruleSet := mustLoadRules(b, "../../examples/map-dispatch/.rpcatlas.yaml")
 	opts := Options{Rules: ruleSet}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -91,7 +91,7 @@ func BenchmarkDetectHandlersMapDispatch(b *testing.B) {
 }
 
 func BenchmarkAnalyzePhasesMapDispatch(b *testing.B) {
-	ruleSet := mustLoadRules(b, "../../examples/map-dispatch/.calltrail.yaml")
+	ruleSet := mustLoadRules(b, "../../examples/map-dispatch/.rpcatlas.yaml")
 	opts := Options{RPC: "ProcessFoo", Depth: 4, Rules: ruleSet}
 
 	b.Run("LoadSources", func(b *testing.B) {

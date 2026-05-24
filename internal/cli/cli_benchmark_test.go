@@ -8,7 +8,7 @@ import (
 func BenchmarkRunListMapDispatch(b *testing.B) {
 	args := []string{
 		"../../examples/map-dispatch",
-		"--config", "../../examples/map-dispatch/.calltrail.yaml",
+		"--config", "../../examples/map-dispatch/.rpcatlas.yaml",
 		"--list",
 	}
 	for i := 0; i < b.N; i++ {
@@ -21,7 +21,7 @@ func BenchmarkRunListMapDispatch(b *testing.B) {
 func BenchmarkRunAlphaMapDispatch(b *testing.B) {
 	args := []string{
 		"../../examples/map-dispatch",
-		"--config", "../../examples/map-dispatch/.calltrail.yaml",
+		"--config", "../../examples/map-dispatch/.rpcatlas.yaml",
 		"--rpc", "ProcessFoo",
 		"--depth", "4",
 	}
@@ -35,7 +35,7 @@ func BenchmarkRunAlphaMapDispatch(b *testing.B) {
 func BenchmarkRunJSONMapDispatch(b *testing.B) {
 	args := []string{
 		"../../examples/map-dispatch",
-		"--config", "../../examples/map-dispatch/.calltrail.yaml",
+		"--config", "../../examples/map-dispatch/.rpcatlas.yaml",
 		"--rpc", "ProcessFoo",
 		"--depth", "4",
 		"--format", "json",

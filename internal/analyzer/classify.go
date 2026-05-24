@@ -4,8 +4,8 @@ import (
 	"go/ast"
 	"strings"
 
-	"github.com/usuginus/calltrail-go/internal/model"
-	"github.com/usuginus/calltrail-go/internal/rules"
+	"github.com/usuginus/go-rpcatlas/internal/model"
+	"github.com/usuginus/go-rpcatlas/internal/rules"
 )
 
 func isHandler(fn *ast.FuncDecl, packageName string, file string, handlerRules rules.HandlerRules) bool {
