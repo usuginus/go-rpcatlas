@@ -70,7 +70,7 @@ This repository includes small Go examples that double as regression fixtures.
 Run the generic gRPC-style example with the built-in rules:
 
 ```sh
-go run ./cmd/calltrail-go ./examples/grpc-basic --rpc GetBook --depth 3
+go run ./cmd/calltrail-go ./examples/grpc-basic --rpc GetFoo --depth 3
 ```
 
 Run the custom-layer example with its project config:
@@ -78,7 +78,7 @@ Run the custom-layer example with its project config:
 ```sh
 go run ./cmd/calltrail-go ./examples/custom-layers \
   --config ./examples/custom-layers/.calltrail.yaml \
-  --rpc PublishArticle \
+  --rpc ProcessFoo \
   --depth 3
 ```
 
@@ -87,17 +87,17 @@ Run the branch-dispatch example to see switch and type-switch details:
 ```sh
 go run ./cmd/calltrail-go ./examples/branch-dispatch \
   --config ./examples/branch-dispatch/.calltrail.yaml \
-  --rpc ProcessDocument \
+  --rpc ProcessFoo \
   --depth 3
 ```
 
 Run the map-dispatch example to see static dispatch tables such as
-`map[Kind]Processor`:
+`map[FooKind]FooProcessor`:
 
 ```sh
 go run ./cmd/calltrail-go ./examples/map-dispatch \
   --config ./examples/map-dispatch/.calltrail.yaml \
-  --rpc ProcessDocument \
+  --rpc ProcessFoo \
   --depth 4
 ```
 

@@ -3,25 +3,25 @@ package transport
 import "context"
 
 type Service struct {
-	app DocumentApplication
+	app FooApplication
 }
 
-type ProcessDocumentRequest struct {
-	Kind DocumentKind
+type ProcessFooRequest struct {
+	Kind FooKind
 	Body string
 }
 
-type ProcessDocumentResponse struct {
+type ProcessFooResponse struct {
 	Result string
 }
 
-func (s *Service) ProcessDocument(ctx context.Context, req *ProcessDocumentRequest) (*ProcessDocumentResponse, error) {
-	result, err := s.app.ProcessDocument(ctx, ProcessDocumentCommand{
+func (s *Service) ProcessFoo(ctx context.Context, req *ProcessFooRequest) (*ProcessFooResponse, error) {
+	result, err := s.app.ProcessFoo(ctx, ProcessFooCommand{
 		Kind: req.Kind,
 		Body: req.Body,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &ProcessDocumentResponse{Result: result}, nil
+	return &ProcessFooResponse{Result: result}, nil
 }

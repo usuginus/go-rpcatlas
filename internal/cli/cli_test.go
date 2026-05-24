@@ -59,13 +59,13 @@ func TestParseAllowsFlagsAfterPaths(t *testing.T) {
 func TestRunListOutputsDetectedHandlers(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	err := Run([]string{"../analyzer/testdata/simple", "--list"}, &stdout, &stderr)
+	err := Run([]string{"../analyzer/testdata/basic_flow", "--list"}, &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("Run returned error: %v\nstderr:\n%s", err, stderr.String())
 	}
 	want := "| rpc | handler | location |\n" +
 		"| --- | --- | --- |\n" +
-		"| `GetFoo` | `Server.GetFoo` | `internal/analyzer/testdata/simple/handler.go:43` |\n"
+		"| `GetFoo` | `Server.GetFoo` | `internal/analyzer/testdata/basic_flow/handler.go:43` |\n"
 	if got := stdout.String(); got != want {
 		t.Fatalf("stdout = %q", got)
 	}
@@ -77,7 +77,7 @@ func TestRunListOutputsDetectedHandlers(t *testing.T) {
 func TestRunListSupportsJSONFormat(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	err := Run([]string{"../analyzer/testdata/simple", "--list", "--format", "json"}, &stdout, &stderr)
+	err := Run([]string{"../analyzer/testdata/basic_flow", "--list", "--format", "json"}, &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("Run returned error: %v\nstderr:\n%s", err, stderr.String())
 	}
@@ -100,7 +100,7 @@ func TestRunListSupportsJSONFormat(t *testing.T) {
 func TestRunJSONOutputsStructuredLayers(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	err := Run([]string{"../analyzer/testdata/simple", "--rpc", "GetFoo", "--depth", "2", "--format", "json"}, &stdout, &stderr)
+	err := Run([]string{"../analyzer/testdata/basic_flow", "--rpc", "GetFoo", "--depth", "2", "--format", "json"}, &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("Run returned error: %v\nstderr:\n%s", err, stderr.String())
 	}
@@ -137,14 +137,14 @@ func TestRunJSONOutputsStructuredLayers(t *testing.T) {
 func TestRunRejectsAmbiguousShortRPCFilter(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	err := Run([]string{"../analyzer/testdata/duplicate", "--rpc", "CreateDocument", "--format", "json"}, &stdout, &stderr)
+	err := Run([]string{"../analyzer/testdata/rpc_filtering", "--rpc", "GetFoo", "--format", "json"}, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("Run returned nil, want ambiguous RPC error")
 	}
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
-	want := `calltrail-go: ambiguous --rpc "CreateDocument" matched 2 handlers; use one of: debugService.CreateDocument, userService.CreateDocument`
+	want := `calltrail-go: ambiguous --rpc "GetFoo" matched 2 handlers; use one of: debugService.GetFoo, userService.GetFoo`
 	if !strings.Contains(stderr.String(), want) {
 		t.Fatalf("stderr does not contain %q:\n%s", want, stderr.String())
 	}
@@ -153,7 +153,7 @@ func TestRunRejectsAmbiguousShortRPCFilter(t *testing.T) {
 func TestRunAllowsReceiverQualifiedRPCFilter(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	err := Run([]string{"../analyzer/testdata/duplicate", "--rpc", "userService.CreateDocument", "--format", "json"}, &stdout, &stderr)
+	err := Run([]string{"../analyzer/testdata/rpc_filtering", "--rpc", "userService.GetFoo", "--format", "json"}, &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("Run returned error: %v\nstderr:\n%s", err, stderr.String())
 	}
@@ -168,8 +168,8 @@ func TestRunAllowsReceiverQualifiedRPCFilter(t *testing.T) {
 	if len(flows) != 1 {
 		t.Fatalf("len(flows) = %d, want 1", len(flows))
 	}
-	if flows[0].Entrypoint.Symbol != "userService.CreateDocument" {
-		t.Fatalf("entrypoint symbol = %q, want userService.CreateDocument", flows[0].Entrypoint.Symbol)
+	if flows[0].Entrypoint.Symbol != "userService.GetFoo" {
+		t.Fatalf("entrypoint symbol = %q, want userService.GetFoo", flows[0].Entrypoint.Symbol)
 	}
 }
 
@@ -179,7 +179,7 @@ func TestRunJSONOutputsBranchDetails(t *testing.T) {
 	err := Run([]string{
 		"../../examples/branch-dispatch",
 		"--config", "../../examples/branch-dispatch/.calltrail.yaml",
-		"--rpc", "ProcessDocument",
+		"--rpc", "ProcessFoo",
 		"--depth", "3",
 		"--format", "json",
 	}, &stdout, &stderr)
@@ -215,7 +215,7 @@ func TestRunJSONOutputsDispatchDetails(t *testing.T) {
 	err := Run([]string{
 		"../../examples/map-dispatch",
 		"--config", "../../examples/map-dispatch/.calltrail.yaml",
-		"--rpc", "ProcessDocument",
+		"--rpc", "ProcessFoo",
 		"--depth", "4",
 		"--format", "json",
 	}, &stdout, &stderr)

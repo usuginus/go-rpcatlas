@@ -4,6 +4,6 @@ import "context"
 
 type previewClient struct{}
 
-func (c *previewClient) RenderImage(ctx context.Context, cmd ProcessDocumentCommand) (string, error) {
-	return "image-preview", nil
+func (c *previewClient) RenderBeta(ctx context.Context, cmd ProcessFooCommand) (string, error) {
+	return "beta-preview", nil
 }

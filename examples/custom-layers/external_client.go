@@ -2,8 +2,8 @@ package transport
 
 import "context"
 
-type searchIndexClient struct{}
+type externalClient struct{}
 
-func (c *searchIndexClient) Index(ctx context.Context, articleID string) error {
+func (c *externalClient) Index(ctx context.Context, fooID string) error {
 	return nil
 }

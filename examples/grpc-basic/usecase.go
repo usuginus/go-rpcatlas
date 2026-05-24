@@ -2,24 +2,24 @@ package grpc
 
 import "context"
 
-type CatalogUsecase interface {
-	GetBook(context.Context, string) (*Book, error)
+type FooUsecase interface {
+	GetFoo(context.Context, string) (*Foo, error)
 }
 
-type catalogUsecase struct {
+type fooUsecase struct {
 	repositories *Repositories
 }
 
 type Repositories struct {
-	Books *bookRepository
+	Foos *fooRepository
 }
 
-var _ CatalogUsecase = (*catalogUsecase)(nil)
+var _ FooUsecase = (*fooUsecase)(nil)
 
-func (u *catalogUsecase) GetBook(ctx context.Context, bookID string) (*Book, error) {
-	book, err := u.repositories.Books.FindBook(ctx, bookID)
+func (u *fooUsecase) GetFoo(ctx context.Context, fooID string) (*Foo, error) {
+	foo, err := u.repositories.Foos.FindFoo(ctx, fooID)
 	if err != nil {
 		return nil, err
 	}
-	return book, nil
+	return foo, nil
 }

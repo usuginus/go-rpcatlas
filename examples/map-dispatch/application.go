@@ -2,44 +2,44 @@ package transport
 
 import "context"
 
-type DocumentKind string
+type FooKind string
 
 const (
-	KindMarkdown DocumentKind = "markdown"
-	KindImage    DocumentKind = "image"
+	KindAlpha FooKind = "alpha"
+	KindBeta  FooKind = "beta"
 )
 
-type ProcessDocumentCommand struct {
-	Kind DocumentKind
+type ProcessFooCommand struct {
+	Kind FooKind
 	Body string
 }
 
-type DocumentApplication interface {
-	ProcessDocument(context.Context, ProcessDocumentCommand) (string, error)
+type FooApplication interface {
+	ProcessFoo(context.Context, ProcessFooCommand) (string, error)
 }
 
-type DocumentProcessor interface {
-	Process(context.Context, ProcessDocumentCommand) (string, error)
+type FooProcessor interface {
+	Process(context.Context, ProcessFooCommand) (string, error)
 }
 
-type documentApplication struct {
-	policy     *documentPolicy
-	processors map[DocumentKind]DocumentProcessor
+type fooApplication struct {
+	policy     *fooPolicy
+	processors map[FooKind]FooProcessor
 }
 
-var _ DocumentApplication = (*documentApplication)(nil)
+var _ FooApplication = (*fooApplication)(nil)
 
-func NewDocumentApplication(store *documentStore, preview *previewClient) DocumentApplication {
-	return &documentApplication{
-		policy: &documentPolicy{},
-		processors: map[DocumentKind]DocumentProcessor{
-			KindMarkdown: newMarkdownProcessor(store),
-			KindImage:    newImageProcessor(preview),
+func NewFooApplication(store *fooStore, preview *previewClient) FooApplication {
+	return &fooApplication{
+		policy: &fooPolicy{},
+		processors: map[FooKind]FooProcessor{
+			KindAlpha: newAlphaProcessor(store),
+			KindBeta:  newBetaProcessor(preview),
 		},
 	}
 }
 
-func (a *documentApplication) ProcessDocument(ctx context.Context, cmd ProcessDocumentCommand) (string, error) {
+func (a *fooApplication) ProcessFoo(ctx context.Context, cmd ProcessFooCommand) (string, error) {
 	processor, ok := a.processors[cmd.Kind]
 	if !ok {
 		return "", a.policy.RejectUnsupportedKind(cmd.Kind)
@@ -47,40 +47,40 @@ func (a *documentApplication) ProcessDocument(ctx context.Context, cmd ProcessDo
 	return processor.Process(ctx, cmd)
 }
 
-type markdownProcessor struct {
-	policy *documentPolicy
-	store  *documentStore
+type alphaProcessor struct {
+	policy *fooPolicy
+	store  *fooStore
 }
 
-func newMarkdownProcessor(store *documentStore) DocumentProcessor {
-	return &markdownProcessor{
-		policy: &documentPolicy{},
+func newAlphaProcessor(store *fooStore) FooProcessor {
+	return &alphaProcessor{
+		policy: &fooPolicy{},
 		store:  store,
 	}
 }
 
-func (p *markdownProcessor) Process(ctx context.Context, cmd ProcessDocumentCommand) (string, error) {
-	if err := p.policy.ValidateMarkdown(cmd); err != nil {
+func (p *alphaProcessor) Process(ctx context.Context, cmd ProcessFooCommand) (string, error) {
+	if err := p.policy.ValidateAlpha(cmd); err != nil {
 		return "", err
 	}
-	return p.store.SaveMarkdown(ctx, cmd)
+	return p.store.SaveAlpha(ctx, cmd)
 }
 
-type imageProcessor struct {
-	policy  *documentPolicy
+type betaProcessor struct {
+	policy  *fooPolicy
 	preview *previewClient
 }
 
-func newImageProcessor(preview *previewClient) DocumentProcessor {
-	return &imageProcessor{
-		policy:  &documentPolicy{},
+func newBetaProcessor(preview *previewClient) FooProcessor {
+	return &betaProcessor{
+		policy:  &fooPolicy{},
 		preview: preview,
 	}
 }
 
-func (p *imageProcessor) Process(ctx context.Context, cmd ProcessDocumentCommand) (string, error) {
-	if err := p.policy.ValidateImage(cmd); err != nil {
+func (p *betaProcessor) Process(ctx context.Context, cmd ProcessFooCommand) (string, error) {
+	if err := p.policy.ValidateBeta(cmd); err != nil {
 		return "", err
 	}
-	return p.preview.RenderImage(ctx, cmd)
+	return p.preview.RenderBeta(ctx, cmd)
 }

@@ -2,22 +2,22 @@ package transport
 
 import "fmt"
 
-type documentPolicy struct{}
+type fooPolicy struct{}
 
-func (p *documentPolicy) RejectUnsupportedKind(kind DocumentKind) error {
-	return fmt.Errorf("unsupported document kind: %s", kind)
+func (p *fooPolicy) RejectUnsupportedKind(kind FooKind) error {
+	return fmt.Errorf("unsupported foo kind: %s", kind)
 }
 
-func (p *documentPolicy) ValidateMarkdown(cmd ProcessDocumentCommand) error {
+func (p *fooPolicy) ValidateAlpha(cmd ProcessFooCommand) error {
 	if cmd.Body == "" {
-		return fmt.Errorf("markdown body is required")
+		return fmt.Errorf("alpha body is required")
 	}
 	return nil
 }
 
-func (p *documentPolicy) ValidateImage(cmd ProcessDocumentCommand) error {
+func (p *fooPolicy) ValidateBeta(cmd ProcessFooCommand) error {
 	if cmd.Body == "" {
-		return fmt.Errorf("image body is required")
+		return fmt.Errorf("beta body is required")
 	}
 	return nil
 }
