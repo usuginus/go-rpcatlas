@@ -147,6 +147,7 @@ jobs:
       - uses: usuginus/go-rpcatlas@v1.0.0
         with:
           path: ./...
+          config: .rpcatlas.yaml
           rpc: GetFoo
           depth: "5"
           format: markdown
@@ -170,6 +171,16 @@ flow, or prepare compact source context before reading a large codebase.
 
 `go-rpcatlas` works without configuration, but `.rpcatlas.yaml` makes the output
 more useful for real projects.
+
+For most repositories, put `.rpcatlas.yaml` at the repository root. Local CLI
+runs automatically discover it by walking up from the target path:
+
+```bash
+rpcatlas ./... --rpc GetFoo --depth 5
+```
+
+In CI, pass `config: .rpcatlas.yaml` explicitly, as shown in the GitHub Action
+example above. For monorepos, point `path` and `config` at the same service.
 
 ```yaml
 # Optional package presets.
