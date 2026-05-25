@@ -11,11 +11,6 @@ and CI.
 
 It does not boot the service, send traffic, or require runtime tracing.
 
-## Introduction Video
-
-See how rpcatlas turns Go RPC handlers into compact, AI-ready flow summaries for
-code explanation, review, and CI.
-
 https://github.com/user-attachments/assets/fb778bb9-be8a-4b7b-8bb1-4cdcd8bd7da3
 
 ## Quick Example
@@ -84,10 +79,9 @@ the places where static resolution mattered.
 
 ### 3. Use the output
 
+- Give it to an AI agent before asking it to explain, review, or modify a request flow.
 - Paste Markdown into a pull request, issue, or review note.
 - Upload it as a CI artifact.
-- Give it to an AI agent before asking it to explain, review, or modify a
-  request flow.
 - Use JSON when you want to build automation around the same analysis data.
 
 ## Why rpcatlas?
