@@ -2,38 +2,119 @@
 
 [![CI](https://github.com/usuginus/go-rpcatlas/actions/workflows/ci.yaml/badge.svg)](https://github.com/usuginus/go-rpcatlas/actions/workflows/ci.yaml)
 
-`go-rpcatlas` generates a compact static RPC map for Go RPC/API handlers.
+AI-ready context for explaining Go RPC flows.
 
-It is built for code review, onboarding, and AI-assisted code reading: point it at a
-handler, then get a deterministic Markdown or JSON summary of the relevant calls,
-layers, branches, dispatches, and interface/function-value edges.
+`go-rpcatlas` generates static RPC/API flow summaries that help AI agents and
+reviewers understand Go code faster. It reads source code, finds handlers, and
+produces deterministic Markdown or JSON for code explanation, review, onboarding,
+and CI.
 
+It does not boot the service, send traffic, or require runtime tracing.
 
+## Introduction Video
+
+See how rpcatlas turns Go RPC handlers into compact, AI-ready flow summaries for
+code explanation, review, and CI.
 
 https://github.com/user-attachments/assets/fb778bb9-be8a-4b7b-8bb1-4cdcd8bd7da3
 
+## Quick Example
 
+### 1. List RPC entry points
 
-## Features
+```bash
+rpcatlas ./... --list
+```
 
-- Find gRPC-style handlers and list available RPCs.
-- Render a readable Markdown call tree for one handler.
-- Group detected functions by configurable layers such as `repository`,
-  `external_client`, or any project-specific name.
-- Surface decision points: interface calls, function-value calls, branches, and
-  keyed dispatches.
-- Use AST-based static analysis only. It does not run the target service.
-- Configure noise filtering and layer rules with `.rpcatlas.yaml`.
+```markdown
+| rpc | handler | location |
+| --- | --- | --- |
+| `GetFoo` | `Server.GetFoo` | `examples/grpc-basic/handler.go:19` |
+```
+
+Use this first when you do not know the exact handler name.
+
+### 2. Inspect one RPC
+
+```bash
+rpcatlas ./... --rpc GetFoo --depth 5
+```
+
+The Markdown report starts with the entry point, then shows the call tree and
+the places where static resolution mattered.
+
+```markdown
+## GetFoo
+
+### execution summary
+
+- kind: `grpc`
+- handler: `Server.GetFoo` (examples/grpc-basic/handler.go:19)
+- request: `*GetFooRequest`
+- response: `*FooResponse`
+- layers:
+  - usecase: 1 call
+  - repository: 1 call
+  - converter: 1 call
+- call resolution:
+  - interface calls: 1
+  - function values: 0
+- control flow:
+  - conditional paths: 0
+  - keyed dispatches: 0
+
+### call tree
+
+- [handler] `Server.GetFoo` (examples/grpc-basic/handler.go:19)
+  - [usecase] `s.fooUsecase.GetFoo` (examples/grpc-basic/handler.go:20)
+    - [usecase] `fooUsecase.GetFoo` (examples/grpc-basic/usecase.go:19)
+      - [repository] `u.repositories.Foos.FindFoo` (examples/grpc-basic/usecase.go:20)
+        - [repository] `fooRepository.FindFoo` (examples/grpc-basic/repository.go:12)
+  - [converter] `s.fooConverter.ToResponse` (examples/grpc-basic/handler.go:24)
+    - [converter] `fooConverter.ToResponse` (examples/grpc-basic/converter.go:5)
+
+### call resolution
+
+#### interface calls
+
+| call | interface | candidates | resolution |
+| --- | --- | --- | --- |
+| `s.fooUsecase.GetFoo` (examples/grpc-basic/handler.go:20) | `FooUsecase` | `fooUsecase.GetFoo` (examples/grpc-basic/usecase.go:19) expanded | single expanded |
+```
+
+### 3. Use the output
+
+- Paste Markdown into a pull request, issue, or review note.
+- Upload it as a CI artifact.
+- Give it to an AI agent before asking it to explain, review, or modify a
+  request flow.
+- Use JSON when you want to build automation around the same analysis data.
+
+## Why rpcatlas?
+
+| Problem | How rpcatlas helps |
+| --- | --- |
+| "Where does this RPC go?" | Shows a handler-centered call tree with source locations. |
+| "What should I read first?" | Groups calls by layer, such as `usecase`, `repository`, and `external_client`. |
+| "Can AI explain this code?" | Produces deterministic context before the agent reads every file. |
+| "Can AI review this flow?" | Fits naturally into review prompts and PR comments. |
+| "Can I run it in CI?" | Runs from source without booting the service or attaching a tracer. |
+| "Where is static resolution important?" | Surfaces interface calls, function values, branches, and keyed dispatches. |
 
 ## Install
-
-### Go install
 
 ```bash
 go install github.com/usuginus/go-rpcatlas/cmd/rpcatlas@latest
 ```
 
-### Install script
+If `rpcatlas` is installed but your shell cannot find it, make sure your Go
+binary directory is on `PATH`:
+
+```bash
+export PATH="$(go env GOPATH)/bin:$PATH"
+```
+
+You can also use the install script:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/usuginus/go-rpcatlas/main/install.sh | sh
@@ -43,39 +124,13 @@ Pin a release or install to a custom directory:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/usuginus/go-rpcatlas/main/install.sh \
-  | VERSION=v0.1.0 INSTALL_DIR=/usr/local/bin sh
-```
-
-## Quick Start
-
-List handlers:
-
-```bash
-rpcatlas ./... --list
-```
-
-Generate a Markdown summary:
-
-```bash
-rpcatlas ./... --rpc GetFoo --depth 5 --format markdown
-```
-
-Generate JSON for automation:
-
-```bash
-rpcatlas ./... --rpc GetFoo --depth 5 --format json
-```
-
-Use a config file:
-
-```bash
-rpcatlas ./... --config .rpcatlas.yaml --rpc GetFoo --depth 5
+  | VERSION=v1.0.0 INSTALL_DIR=/usr/local/bin sh
 ```
 
 ## GitHub Action
 
-This repository also ships a composite action. It installs the CLI from the same
-ref as the action and runs it in your workflow.
+This repository ships a composite action. It installs the CLI from the same ref
+as the action and runs it in your workflow.
 
 ```yaml
 name: rpcatlas
@@ -89,7 +144,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: usuginus/go-rpcatlas@main
+      - uses: usuginus/go-rpcatlas@v1.0.0
         with:
           path: ./...
           rpc: GetFoo
@@ -103,12 +158,18 @@ jobs:
           path: rpcatlas.md
 ```
 
-For repeatable CI, pin the action to a release tag once releases are available.
+## AI Agent Skill
+
+This repository includes an optional agent skill at
+[skills/rpcatlas/SKILL.md](skills/rpcatlas/SKILL.md).
+
+Use it when an AI agent needs to explain a Go RPC/API handler, review a request
+flow, or prepare compact source context before reading a large codebase.
 
 ## Configuration
 
 `go-rpcatlas` works without configuration, but `.rpcatlas.yaml` makes the output
-much more useful for real projects.
+more useful for real projects.
 
 ```yaml
 # Optional package presets.
@@ -125,6 +186,18 @@ ignore_calls:
 
 # Output sections. The name is emitted as-is.
 layers:
+  - name: application
+    match:
+      call_name_contains:
+        - usecase
+        - service
+      receiver_type_contains:
+        - usecase
+        - service
+      file_path_contains:
+        - /usecase/
+        - /service/
+
   - name: repository
     match:
       call_name_contains:
@@ -145,95 +218,12 @@ layers:
         - /gateway/
 ```
 
-See [rpcatlas.example.yaml](rpcatlas.example.yaml) for a fuller starting
-point.
+See [rpcatlas.example.yaml](rpcatlas.example.yaml) for a fuller starting point.
 
-## Output
+## Output Modes
 
-Markdown output is designed to be pasted into a pull request, issue, or AI
-review prompt. It highlights the entry point, the important downstream calls, and
-the places where static resolution matters.
-
-```markdown
-## GetFoo
-
-### execution summary
-
-- kind: `grpc`
-- handler: `Service.GetFoo` (internal/handler/foo.go:24)
-- request: `*foov1.GetFooRequest`
-- response: `*foov1.GetFooResponse`
-- layers:
-  - application: 1 call
-  - repository: 1 call
-  - external_client: 1 call
-- call resolution:
-  - interface calls: 1
-  - function values: 1
-- control flow:
-  - conditional paths: 1
-  - keyed dispatches: 1
-
-### call tree
-
-- [handler] `Service.GetFoo` (internal/handler/foo.go:24)
-  - [application] `s.fooService.GetFoo` (internal/handler/foo.go:31)
-    - [repository] `fooRepo.Find` (internal/repository/foo.go:18)
-    - [external_client] `profileClient.Get` (internal/client/profile.go:42)
-  - [application] `workflow.Run` (internal/workflow/foo.go:15)
-    - [function_value] `validateFoo` (internal/workflow/foo.go:28)
-
-### function index
-
-#### application
-
-| function | location | occurrences |
-| --- | --- | ---: |
-| `s.fooService.GetFoo` | `internal/handler/foo.go:31` | 1 |
-| `workflow.Run` | `internal/workflow/foo.go:15` | 1 |
-
-#### repository
-
-| function | location | occurrences |
-| --- | --- | ---: |
-| `fooRepo.Find` | `internal/repository/foo.go:18` | 1 |
-
-#### external_client
-
-| function | location | occurrences |
-| --- | --- | ---: |
-| `profileClient.Get` | `internal/client/profile.go:42` | 1 |
-
-### call resolution
-
-#### interface calls
-
-| call | interface | candidates | resolution |
-| --- | --- | --- | --- |
-| `s.fooService.GetFoo` (internal/handler/foo.go:31) | `FooService` | `fooService.GetFoo` (internal/service/foo.go:12) expanded | single expanded |
-
-#### function values
-
-| wrapper | function value | resolved function | resolution |
-| --- | --- | --- | --- |
-| `workflow.Run` (internal/workflow/foo.go:15) | `validateFoo` | `validateFoo` (internal/workflow/foo.go:28) expanded | direct function argument |
-
-### control flow
-
-#### conditional paths
-
-| function | condition | path | calls |
-| --- | --- | --- |
-| `fooService.GetFoo` | `req.IncludeProfile` | if | `profileClient.Get` |
-
-#### keyed dispatches
-
-| lookup | case | calls |
-| --- | --- | --- |
-| `processors[req.Kind]` | `FooKindStandard` | `standardProcessor.Process` |
-```
-
-JSON output contains the same analysis data in a machine-readable shape.
+- `--format markdown`: optimized for pull requests, issues, docs, and AI prompts.
+- `--format json`: the same analysis data in a machine-readable shape.
 
 ## Public Sample
 
@@ -248,12 +238,14 @@ rpcatlas /tmp/go-clean-template --list
 ## Limits
 
 `go-rpcatlas` is intentionally lightweight. It relies on Go AST and type
-information plus project-configurable heuristics; it is not a full SSA or runtime
-tracer.
+information plus project-configurable heuristics; it is not a full SSA analyzer
+or runtime tracer.
 
 That means it can produce a concise, deterministic summary quickly, but it may
 miss calls that depend on complex runtime wiring, reflection, generated dynamic
 registries, or build tags that are not active in the current environment.
+
+Always verify critical behavior by reading the source code.
 
 ## Development
 
@@ -263,4 +255,4 @@ go build -o /tmp/rpcatlas ./cmd/rpcatlas
 /tmp/rpcatlas ./examples/grpc-basic --rpc GetFoo --depth 4
 ```
 
-The CI workflow also checks formatting, unit tests, and coverage summary output.
+The CI workflow checks formatting, unit tests, and coverage summary output.
