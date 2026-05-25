@@ -99,7 +99,13 @@ the places where static resolution mattered.
 | "Can AI explain this code?" | Produces deterministic context before the agent reads every file. |
 | "Can AI review this flow?" | Fits naturally into review prompts and PR comments. |
 | "Can I run it in CI?" | Runs from source without booting the service or attaching a tracer. |
+| "Is it safe to add to CI?" | Has no third-party module dependencies and keeps the supply-chain surface minimal. |
 | "Where is static resolution important?" | Surfaces interface calls, function values, branches, and keyed dispatches. |
+
+## Lightweight by Design
+
+`go-rpcatlas` is built with Go's standard AST and type-analysis packages. The
+small dependency surface keeps installs simple and audits straightforward.
 
 ## Install
 
